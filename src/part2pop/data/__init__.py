@@ -2,7 +2,7 @@ import io
 from functools import lru_cache
 import importlib_resources
 
-@lru_cache(maxsize=64)
+@lru_cache(maxsize=None)
 def _read_dataset(filename: str, encoding: str) -> str:
     """Read and cache a data file from package resources."""
     resource = importlib_resources.files("part2pop.data").joinpath(filename)
