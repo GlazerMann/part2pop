@@ -13,13 +13,15 @@ Note: functions use NumPy and SciPy for numerical operations.
 from .species.base import AerosolSpecies
 from .species.registry import get_species, retrieve_one_species
 # from . import data_path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple, Optional
 import numpy as np
 from scipy.constants import R
 import scipy.optimize as opt
 import warnings
 
+
+@dataclass
 class Particle:
     """Represent an aerosol particle by species composition and masses.
 
@@ -33,14 +35,16 @@ class Particle:
     Methods provide convenient accessors for dry/wet diameters, volumes,
     effective kappa, and critical supersaturation.
     """
+    species: Tuple[AerosolSpecies, ...]
+    masses: Tuple[float, ...]
 
-    def __init__(self, species, masses):
-        self.species=species 
-        self.masses=np.array(masses, dtype=float)
-    
     def __post_init__(self):
-        assert(len(self.species) == len(self.masses) )
-    
+        if len(self.species) != len(self.masses):
+            raise ValueError(
+                f"species and masses must have the same length, got "
+                f"{len(self.species)} and {len(self.masses)}"
+            )
+        self.masses = np.array(self.masses, dtype=float)
     def _equilibrate_h2o(
             self, RH,T,maxRH=0.99,
             sigma_h2o=0.072, rho_h2o=1000., MW_h2o=18e-3):
