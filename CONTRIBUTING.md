@@ -17,6 +17,7 @@ Thank you for your interest in improving `part2pop`.
 Before opening a pull request, run:
 
 ```bash
+pip install -e ".[test]"
 pytest tests/unit -q
 pytest tests/integration -q
 ```
