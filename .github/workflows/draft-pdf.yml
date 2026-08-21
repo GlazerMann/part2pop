@@ -3,21 +3,31 @@ name: Build draft JOSS PDF
 on:
   workflow_dispatch:
   push:
-    branches: ["main"]
+    branches: [main]
     paths:
       - "paper/**"
       - ".github/workflows/draft-pdf.yml"
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: draft-pdf-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-draft-pdf:
+    name: Build and commit draft PDF
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build paper PDF
         run: |
@@ -31,13 +41,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add paper/paper.pdf
+          git add -- paper/paper.pdf
 
           if git diff --cached --quiet; then
             echo "No paper PDF changes to commit."
             exit 0
           fi
 
-          git commit -m "docs: update draft JOSS paper PDF"
+          git commit -m "docs: update draft JOSS paper PDF [skip ci]"
           git push
