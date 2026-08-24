@@ -21,7 +21,7 @@ import scipy.optimize as opt
 import warnings
 
 
-@dataclass
+@dataclass(eq=False)
 class Particle:
     """Represent an aerosol particle by species composition and masses.
 
