@@ -3,6 +3,6 @@ DENSITY_LIQUID_WATER = 1000. # kg/m^3
 
 try:
     from scipy.constants import R
-except:
+except ImportError:
     R = 8.31446261815324
 
