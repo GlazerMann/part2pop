@@ -13,7 +13,7 @@ Note: functions use NumPy and SciPy for numerical operations.
 from .species.base import AerosolSpecies
 from .species.registry import get_species, retrieve_one_species
 # from . import data_path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Tuple, Optional
 import numpy as np
 from scipy.constants import R
@@ -36,15 +36,22 @@ class Particle:
     effective kappa, and critical supersaturation.
     """
     species: Tuple[AerosolSpecies, ...]
-    masses: Tuple[float, ...]
+    masses: np.ndarray
 
     def __post_init__(self):
+        self.species = tuple(self.species)
+        self.masses = np.asarray(self.masses, dtype=float)
+
+        if self.masses.ndim != 1:
+            raise ValueError(
+                f"masses must be one-dimensional, got shape {self.masses.shape}"
+            )
         if len(self.species) != len(self.masses):
             raise ValueError(
                 f"species and masses must have the same length, got "
                 f"{len(self.species)} and {len(self.masses)}"
             )
-        self.masses = np.array(self.masses, dtype=float)
+
     def _equilibrate_h2o(
             self, RH,T,maxRH=0.99,
             sigma_h2o=0.072, rho_h2o=1000., MW_h2o=18e-3):
