@@ -195,7 +195,12 @@ def get_mam_input(varname,mam_input_filename):
     if yep == 0:
         # raise ValueError(varname,'is not a MAM input parameter')
         vardat = 0.0
-        warnings.warn(varname + ' is not a MAM input parameter; returning 0.0')    
+        warnings.warn(
+            f"{varname} is not a MAM input parameter; returning 0.0",
+            UserWarning,
+            stacklevel=2,
+        )
+  
     elif yep > 1:
         raise ValueError('more than one line in ', mam_input_filename, 'starts with', varname)
     return vardat
