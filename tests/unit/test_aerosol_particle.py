@@ -209,3 +209,37 @@ def test_make_particle_applies_species_modifications():
     assert particle_mod.get_tkappa() < particle_base.get_tkappa()
     assert particle_mod.get_trho() == new_density
     assert particle_mod.get_tkappa() == new_kappa
+
+def _species_pair():
+    return (
+        retrieve_one_species("SO4"),
+        retrieve_one_species("H2O"),
+    )
+
+
+def test_particle_converts_masses_to_numpy_array():
+    particle = Particle(
+        species=_species_pair(),
+        masses=(1.0, 2.0),
+    )
+
+    assert isinstance(particle.species, tuple)
+    assert isinstance(particle.masses, np.ndarray)
+    assert particle.masses.dtype == float
+    np.testing.assert_allclose(particle.masses, [1.0, 2.0])
+
+
+def test_particle_rejects_mismatched_species_and_mass_lengths():
+    with pytest.raises(ValueError, match="same length"):
+        Particle(
+            species=(retrieve_one_species("SO4"),),
+            masses=(1.0, 2.0),
+        )
+
+
+def test_particle_rejects_non_1d_masses():
+    with pytest.raises(ValueError, match="one-dimensional"):
+        Particle(
+            species=_species_pair(),
+            masses=[[1.0], [2.0]],
+        )
