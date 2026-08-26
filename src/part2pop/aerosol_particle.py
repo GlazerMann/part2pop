@@ -20,7 +20,6 @@ from scipy.constants import R
 import scipy.optimize as opt
 import warnings
 
-
 @dataclass(eq=False)
 class Particle:
     """Represent an aerosol particle by species composition and masses.
