@@ -243,3 +243,12 @@ def test_particle_rejects_non_1d_masses():
             species=_species_pair(),
             masses=[[1.0], [2.0]],
         )
+
+def test_particle_copies_input_masses():
+    masses = np.array([1.0, 2.0])
+    particle = Particle(
+        species=_species_pair(),
+        masses=masses,
+    )
+    masses[0] = 99.0
+    assert particle.masses[0] == 1.0
