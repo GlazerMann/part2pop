@@ -39,7 +39,7 @@ class Particle:
 
     def __post_init__(self):
         self.species = tuple(self.species)
-        self.masses = np.asarray(self.masses, dtype=float)
+        self.masses = np.array(self.masses, dtype=float, copy=True)
 
         if self.masses.ndim != 1:
             raise ValueError(
