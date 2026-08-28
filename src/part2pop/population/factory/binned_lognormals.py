@@ -54,6 +54,36 @@ def build(config):
     
     aero_spec_names_list = resolve_species_name_rows(config['aero_spec_names'])
     aero_spec_fracs_list = config['aero_spec_fracs']
+
+    # All of these fields describe one value/row per aerosol mode. The
+    # construction loop below uses zip(), which silently truncates to the
+    # shortest iterable, so reject inconsistent configurations explicitly.
+    mode_lengths = {
+        "N": len(N_list),
+        "GMD": len(GMD_list),
+        "GSD": len(GSD_list),
+        "N_bins": len(N_bins_list),
+        "aero_spec_names": len(aero_spec_names_list),
+        "aero_spec_fracs": len(aero_spec_fracs_list),
+    }
+    if len(set(mode_lengths.values())) != 1:
+        lengths = ", ".join(
+            f"{name}={length}" for name, length in mode_lengths.items()
+        )
+        raise ValueError(
+            "Per-mode configuration fields must have the same number of modes; "
+            f"got {lengths}."
+        )
+
+    for mode_idx, (mode_names, mode_fracs) in enumerate(
+            zip(aero_spec_names_list, aero_spec_fracs_list)):
+        if len(mode_names) != len(mode_fracs):
+            raise ValueError(
+                "aero_spec_names and aero_spec_fracs must have matching lengths "
+                f"within each mode; mode {mode_idx} has {len(mode_names)} names "
+                f"and {len(mode_fracs)} fractions."
+            )
+    
     # Support compound-like species names (e.g., NaCl, (NH4)2SO4)
     # aero_spec_names_list, aero_spec_fracs_list = expand_compounds_for_population(
     #     aero_spec_names_list, aero_spec_fracs_list
