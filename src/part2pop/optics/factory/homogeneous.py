@@ -16,7 +16,10 @@ except Exception as e:
     MieQ = None
     _PMS_ERR = e
 
-
+# Rayleigh theory is an asymptotic small-particle approximation.  There is no
+# sharp universal cutoff, so use a deliberately conservative threshold for
+# warning users when the fallback is being pushed outside x << 1.
+_RAYLEIGH_WARNING_X = 0.1
 
 @register("homogeneous")
 class HomogeneousParticle(OpticalParticle):
@@ -131,19 +134,11 @@ class HomogeneousParticle(OpticalParticle):
         Prefer PyMieScatt if available; otherwise use the Rayleigh approximation.
         """
         if MieQ is None:
-            warnings.warn(
-                "PyMieScatt is unavailable; homogeneous optics are using the "
-                "Rayleigh-sphere approximation. This fallback is only reliable "
-                "when the particle size parameter x = 2*pi*r/lambda is much "
-                "smaller than 1.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
+            max_rayleigh_size_parameter = 0.0
 
         for rr, rh in enumerate(self.rh_grid):
             D_m = float(self.get_Dwet(RH=float(rh), T=self.temp, sigma_sa=self.get_surface_tension()))
             r_m = 0.5 * D_m
-            area = math.pi * r_m * r_m  # geometric cross-section
 
             D_nm = D_m * 1e9
             for ww, lam_m in enumerate(self.wvl_grid):
@@ -159,6 +154,11 @@ class HomogeneousParticle(OpticalParticle):
                     self.Cabs[rr, ww] = out["Qabs"] * geom_area
                     self.g[rr, ww] = out["g"]
                 else:
+                    size_parameter = 2.0 * math.pi * r_m / float(lam_m)
+                    max_rayleigh_size_parameter = max(
+                        max_rayleigh_size_parameter,
+                        size_parameter,
+                    )
                     cext, csca, cabs, g = self._rayleigh_cross_sections(
                         m=m,
                         wavelength_m=float(lam_m),
@@ -168,7 +168,26 @@ class HomogeneousParticle(OpticalParticle):
                     self.Csca[rr, ww] = csca
                     self.Cabs[rr, ww] = cabs
                     self.g[rr, ww] = g
-    
+
+        if MieQ is None:
+            message = (
+                "PyMieScatt is unavailable; homogeneous optics are using the "
+                "Rayleigh-sphere approximation."
+            )
+            if max_rayleigh_size_parameter >= _RAYLEIGH_WARNING_X:
+                message += (
+                    " The maximum particle size parameter in this calculation "
+                    f"is x={max_rayleigh_size_parameter:.3g}, which is not below "
+                    f"the conservative Rayleigh warning threshold "
+                    f"x={_RAYLEIGH_WARNING_X:g}; results may be inaccurate."
+                )
+            else:
+                message += (
+                    " All evaluated particle size parameters are below the "
+                    f"conservative warning threshold x={_RAYLEIGH_WARNING_X:g}."
+                )
+            warnings.warn(message, RuntimeWarning, stacklevel=2)
+
     # Convenience getters (unchanged)
     def get_cross_sections(self):
         return {
