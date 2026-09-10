@@ -144,11 +144,17 @@ class HomogeneousParticle(OpticalParticle):
         for rr, rh in enumerate(self.rh_grid):
             D_m = float(self.get_Dwet(RH=float(rh), T=self.temp, sigma_sa=self.get_surface_tension()))
             r_m = 0.5 * D_m
+            area = math.pi * r_m * r_m  # geometric cross-section
 
             D_nm = D_m * 1e9
             for ww, lam_m in enumerate(self.wvl_grid):
                 lam_nm = float(lam_m * 1e9)
                 m = complex(self._mixture_ri(rr, ww))
+                # out = MieQ(m, lam_nm, D_nm, asDict=True, asCrossSection=False)
+                # # Convert efficiencies to absolute cross sections via geometric area
+                # self.Cext[rr, ww] = out["Qext"] * area
+                # self.Csca[rr, ww] = out["Qsca"] * area
+                # self.Cabs[rr, ww] = out["Qabs"] * area
 
                 if MieQ is not None:
                     out = MieQ(m, lam_nm, D_nm, asDict=True, asCrossSection=False)
