@@ -57,7 +57,8 @@ def build(config):
 
     # All of these fields describe one value/row per aerosol mode. The
     # construction loop below uses zip(), which silently truncates to the
-    # shortest iterable, so reject inconsistent configurations explicitly.
+    # shortest iterable unless strict=True, so reject inconsistent
+    # configurations explicitly and retain strict zips as defense in depth.
     mode_lengths = {
         "N": len(N_list),
         "GMD": len(GMD_list),
@@ -75,13 +76,38 @@ def build(config):
             f"got {lengths}."
         )
 
+    validated_n_bins = []
+    for mode_idx, raw_n_bins in enumerate(N_bins_list):
+        try:
+            n_bins_value = float(raw_n_bins)
+            n_bins = int(raw_n_bins)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"N_bins for mode {mode_idx} must be an integer >= 2; "
+                f"got {raw_n_bins!r}."
+            ) from exc
+        if not np.isfinite(n_bins_value) or n_bins_value != n_bins or n_bins < 2:
+            raise ValueError(
+                f"N_bins for mode {mode_idx} must be an integer >= 2; "
+                f"got {raw_n_bins!r}."
+            )
+        validated_n_bins.append(n_bins)
+    N_bins_list = validated_n_bins
+
     for mode_idx, (mode_names, mode_fracs) in enumerate(
-            zip(aero_spec_names_list, aero_spec_fracs_list)):
+            zip(aero_spec_names_list, aero_spec_fracs_list, strict=True)):
         if len(mode_names) != len(mode_fracs):
             raise ValueError(
                 "aero_spec_names and aero_spec_fracs must have matching lengths "
                 f"within each mode; mode {mode_idx} has {len(mode_names)} names "
                 f"and {len(mode_fracs)} fractions."
+            )
+
+        canonical_keys = [str(name).casefold() for name in mode_names]
+        if len(canonical_keys) != len(set(canonical_keys)):
+            raise ValueError(
+                "aero_spec_names contains duplicate canonical species after "
+                f"alias resolution in mode {mode_idx}: {mode_names!r}."
             )
     
     # Support compound-like species names (e.g., NaCl, (NH4)2SO4)
@@ -114,7 +140,15 @@ def build(config):
     
     part_id = 0
     for mode_idx, (Ntot, GMD, GSD, mode_spec_names, mode_spec_fracs, N_bins) in enumerate(
-            zip(N_list, GMD_list, GSD_list, aero_spec_names_list, aero_spec_fracs_list, N_bins_list)):
+            zip(
+                N_list,
+                GMD_list,
+                GSD_list,
+                aero_spec_names_list,
+                aero_spec_fracs_list,
+                N_bins_list,
+                strict=True,
+            )):
         # determine bin edges: either global or per-mode
         if global_D_min is not None:
             # use global edges (N_bins bins => N_bins+1 edges)
@@ -133,7 +167,9 @@ def build(config):
         
         # Map this mode's fractions to the full population species list
         # For each species in pop_species_names, use the fraction from this mode, or 0 if not present
-        mode_spec_name_to_frac = dict(zip(mode_spec_names, mode_spec_fracs))
+        mode_spec_name_to_frac = dict(
+            zip(mode_spec_names, mode_spec_fracs, strict=True)
+        )
         pop_aligned_fracs = [mode_spec_name_to_frac.get(n, 0.0) for n in pop_species_names]
         pdf_wrt_logD = norm(loc=np.log10(GMD), scale=np.log10(GSD))
         N_per_bins = pdf_wrt_logD.pdf(np.log10(D_mids)) * bin_width
