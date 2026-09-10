@@ -149,7 +149,7 @@ class HomogeneousParticle(OpticalParticle):
                 if MieQ is not None:
                     out = MieQ(m, lam_nm, D_nm, asDict=True, asCrossSection=False)
                     # Convert efficiencies to absolute cross sections.
-                    geom_area = np.pi / 4.0 * D_nm ** 2 * 1e-18
+                    geom_area = np.pi / 4.0 * D_nm ** 2 * 1e-18 # from nm^2 to m^2
                     self.Cext[rr, ww] = out["Qext"] * geom_area
                     self.Csca[rr, ww] = out["Qsca"] * geom_area
                     self.Cabs[rr, ww] = out["Qabs"] * geom_area
