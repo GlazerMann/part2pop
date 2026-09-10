@@ -10,5 +10,9 @@ def _read_dataset(filename: str, encoding: str) -> str:
         return f.read()
 
 def open_dataset(filename: str, encoding: str = "utf-8") -> io.StringIO:
-    """Return a readable stream for a cached package data file."""
+    """Return a fresh readable stream over cached package-data text.
+    Every call has an independent cursor and lifetime. The returned object is
+    intentionally an in-memory text stream; OS-backed file attributes such as
+    ``name`` and ``fileno()`` are not part of this helper's contract.
+    """
     return io.StringIO(_read_dataset(filename, encoding))
