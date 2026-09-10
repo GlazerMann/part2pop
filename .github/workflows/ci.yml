@@ -113,5 +113,15 @@ jobs:
       - name: Test the installed wheel
         run: |
           mv src "${RUNNER_TEMP}/part2pop-src"
-          python -c "import part2pop; print(f'Testing {part2pop.__file__}')"
+          python - <<'PY'
+          from pathlib import Path
+          import part2pop
+          package_path = Path(part2pop.__file__).resolve()
+          repository_root = Path.cwd().resolve()
+          if package_path == repository_root or repository_root in package_path.parents:
+              raise SystemExit(
+                  f"Expected installed wheel, but imported repository copy at {package_path}"
+              )
+          print(f"Testing installed package at {package_path}")
+          PY
           python -m pytest tests/integration
