@@ -1,0 +1,68 @@
+import math
+
+import pytest
+
+import part2pop.optics.factory.homogeneous as homogeneous
+from part2pop.optics.factory.homogeneous import HomogeneousParticle
+from part2pop.population.builder import build_population
+
+
+def _base_particle(diameter_m=0.20e-6):
+    population = build_population(
+        {
+            "type": "monodisperse",
+            "aero_spec_names": [["BC", "SO4", "H2O"]],
+            "N": [1.0e6],
+            "D": [diameter_m],
+            "aero_spec_fracs": [[0.2, 0.7, 0.1]],
+        }
+    )
+    return population.get_particle(population.ids[0])
+
+
+@pytest.mark.skipif(
+    homogeneous.MieQ is None,
+    reason=f"PyMieScatt not available: {homogeneous._PMS_ERR}",
+)
+def test_rayleigh_matches_mie_in_small_particle_limit():
+    refractive_index = complex(1.5, 0.0)
+    wavelength_m = 550e-9
+    radius_m = 5e-9
+
+    cext, csca, cabs, g = HomogeneousParticle._rayleigh_cross_sections(
+        m=refractive_index,
+        wavelength_m=wavelength_m,
+        radius_m=radius_m,
+    )
+
+    diameter_nm = 2.0 * radius_m * 1e9
+    wavelength_nm = wavelength_m * 1e9
+    mie = homogeneous.MieQ(
+        refractive_index,
+        wavelength_nm,
+        diameter_nm,
+        asDict=True,
+        asCrossSection=False,
+    )
+    geometric_area = math.pi * radius_m**2
+
+    assert csca == pytest.approx(mie["Qsca"] * geometric_area, rel=0.02)
+    assert cext == pytest.approx(mie["Qext"] * geometric_area, rel=0.02)
+    assert cabs == pytest.approx(0.0, abs=1e-30)
+    assert g == pytest.approx(0.0)
+
+
+def test_rayleigh_fallback_warning_reports_actual_size_parameter(monkeypatch):
+    monkeypatch.setattr(homogeneous, "MieQ", None)
+
+    with pytest.warns(RuntimeWarning) as seen:
+        HomogeneousParticle(
+            _base_particle(),
+            {"wvl_grid": [550e-9], "rh_grid": [0.0]},
+        )
+
+    messages = [str(item.message) for item in seen]
+    assert any("Rayleigh-sphere approximation" in message for message in messages)
+    assert any("maximum particle size parameter" in message for message in messages)
+    assert any("x=" in message for message in messages)
+
