@@ -28,6 +28,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The commit step rebases before pushing, so retain enough history
+          # to find a common ancestor if main advances while the PDF builds.
+          fetch-depth: 0
 
       - name: Build paper PDF
         run: |
@@ -49,4 +53,9 @@ jobs:
           fi
 
           git commit -m "docs: update draft JOSS paper PDF [skip ci]"
-          git push
+          # A human or another workflow may have advanced main while the PDF
+          # was building. Rebase rather than force-pushing or failing with a
+          # stale checkout.
+          git fetch --no-tags origin main
+          git rebase origin/main
+          git push origin HEAD:main
