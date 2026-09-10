@@ -16,6 +16,7 @@ except Exception as e:
     MieQ = None
     _PMS_ERR = e
 
+
 # Rayleigh theory is an asymptotic small-particle approximation.  There is no
 # sharp universal cutoff, so use a deliberately conservative threshold for
 # warning users when the fallback is being pushed outside x << 1.
