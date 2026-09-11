@@ -29,7 +29,7 @@ class FractalParticle(OpticalParticle):
     Constructor expects (base_particle, config) to align with the factory builder.
 
     Optional config (read by OpticalParticle or here):
-      - rh_grid, wvl_grid, temp (K), specdata_path, species_modifications)
+      - rh_grid, wvl_grid, temp (K), specdata_path, species_modifications
     """
 
     def __init__(self, base_particle, config):
