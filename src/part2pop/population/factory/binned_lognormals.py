@@ -88,8 +88,8 @@ def build(config):
     for mode_idx, raw_n_bins in enumerate(N_bins_list):
         try:
             n_bins_value = float(raw_n_bins)
-            n_bins = int(raw_n_bins)
-        except (TypeError, ValueError) as exc:
+            n_bins = int(n_bins_value)
+        except (TypeError, ValueError, OverflowError) as exc:
             raise ValueError(
                 f"N_bins for mode {mode_idx} must be an integer >= 2; "
                 f"got {raw_n_bins!r}."
