@@ -17,6 +17,10 @@ import matplotlib.pyplot as plt
 
 @register("binned_lognormals")
 def build(config):
+    # Preserve N_bins before normalize_population_config(), whose historical
+    # integer conversion would otherwise turn a value such as 2.5 into 2
+    # before this factory can reject it.
+    raw_n_bins_config = config.get("N_bins", 100)
     config = normalize_population_config(config)
     # fixme: make this +/- certain number of sigmas (rather than min/max diams)
     # D_min = float(config['D_min'])
@@ -26,13 +30,17 @@ def build(config):
     GMD_list = config['GMD']
     GSD_list = config['GSD']
     
-    N_bins_list = config['N_bins']
-    if type(config['N_bins']) is list:
-        N_bins_list = config.get('N_bins')
+    if isinstance(raw_n_bins_config, (str, bytes)) or np.isscalar(raw_n_bins_config):
+        N_bins_list = [raw_n_bins_config] * len(GMD_list)
     else:
-        N_bins_val = config.get('N_bins',100)
-        N_bins_list = [N_bins_val]*len(GMD_list)
-    
+        try:
+            N_bins_list = list(raw_n_bins_config)
+        except TypeError as exc:
+            raise ValueError(
+                f"N_bins must be an integer >= 2 or an iterable of such values; "
+                f"got {raw_n_bins_config!r}."
+            ) from exc
+
     # todo: right now, N_sigmas same for all modes; could be per-mode if needed
     
     N_sigmas = float(config.get('N_sigmas', 5))  # used to set bin ranges for each mode
