@@ -100,7 +100,7 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Verify release tag matches project version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
