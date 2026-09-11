@@ -15,7 +15,7 @@ def _config():
     }
 
 
-@pytest.mark.parametrize("bad_n_bins", [0, 1, 1.5, "bogus"])
+@pytest.mark.parametrize("bad_n_bins", [0, 1, 1.5, 2.5, "bogus"])
 def test_binned_lognormals_rejects_invalid_bin_count(bad_n_bins):
     config = _config()
     config["N_bins"] = [bad_n_bins]
