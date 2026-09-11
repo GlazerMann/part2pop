@@ -7,6 +7,8 @@ on:
       - "feature/**"
       - "features/**"
       - "debug/**"
+    tags:
+      - "v*"
   pull_request:
     branches: [main]
   schedule:
@@ -19,7 +21,9 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Superseded branch/PR CI should stop, but a release-tag run must never be
+  # cancelled automatically once verification or publication has started.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
 env:
   MPLBACKEND: Agg
@@ -76,8 +80,8 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
-  integration-tests:
-    name: Build and test wheel
+  distributions:
+    name: Build and test distributions
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: unit-tests
@@ -95,6 +99,30 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
+      - name: Verify release tag matches project version
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import tomllib
+
+          version = tomllib.loads(
+              Path("pyproject.toml").read_text(encoding="utf-8")
+          )["project"]["version"]
+
+          expected_tag = f"v{version}"
+          actual_tag = os.environ["RELEASE_TAG"]
+
+          if actual_tag != expected_tag:
+              raise SystemExit(
+                  f"Release tag {actual_tag!r} must match "
+                  f"project version {expected_tag!r}"
+              )
+          PY
+
       - name: Install build and test tools
         run: |
           python -m pip install --upgrade pip
@@ -110,18 +138,57 @@ jobs:
           python -m pip install dist/*.whl
           python -m pip check
 
-      - name: Test the installed wheel
+      - name: Test installed wheel
         run: |
+          # tests/conftest.py deliberately inserts ./src into sys.path when it
+          # exists. Move src aside only after source-tree unit tests have run,
+          # so these integration tests prove the built wheel is actually used.
           mv src "${RUNNER_TEMP}/part2pop-src"
+
           python - <<'PY'
           from pathlib import Path
           import part2pop
+
           package_path = Path(part2pop.__file__).resolve()
           repository_root = Path.cwd().resolve()
+
           if package_path == repository_root or repository_root in package_path.parents:
               raise SystemExit(
-                  f"Expected installed wheel, but imported repository copy at {package_path}"
+                  "Expected installed wheel, but imported repository copy at "
+                  f"{package_path}"
               )
+
           print(f"Testing installed package at {package_path}")
           PY
+
           python -m pytest tests/integration
+
+      - name: Upload verified release distributions
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: distributions
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish distributions
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: distributions
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download verified distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: distributions
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
