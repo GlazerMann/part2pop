@@ -8,6 +8,7 @@ import numpy as np
 
 from ..population.base import ParticlePopulation
 from ..species.registry import get_species
+from ._utils import _decode_population_metadata
 
 __all__ = ["load_population"]
 
@@ -50,6 +51,10 @@ def load_population(
             ids=list(ids),
             species_modifications=species_mods,
         )
+        if "population_metadata" in metadata:
+            population_metadata = _decode_population_metadata(metadata["population_metadata"], archive)
+            population.metadata = population_metadata
+            metadata["population_metadata"] = population_metadata
 
         for attr in metadata.get("extra_attrs", []):
             key = f"extra__{attr}"
