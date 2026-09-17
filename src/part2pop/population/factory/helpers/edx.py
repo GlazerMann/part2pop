@@ -1,43 +1,73 @@
-"""EDX-specific helper functions for population reconstruction."""
+"""EDX-specific helpers for elemental-to-aerosol-species reconstruction.
 
+EDX input composition is measured on an elemental mass-fraction basis. This
+module reconstructs approximate aerosol-species mass fractions using a named
+set of stoichiometric and grouping assumptions required by downstream part2pop
+calculations. The reconstruction is not unique and should not be interpreted as
+a direct measurement of aerosol material species.
+"""
+
+from dataclasses import dataclass
 from typing import Any, Dict
-import pandas as pd
-import numpy as np
 import warnings
+
+import numpy as np
+import pandas as pd
 
 
 _MASS_SUM_MIN = 0.99
 _MASS_SUM_MAX = 1.01
 _PERCENT_SUM_TARGET = 100.0
 _CARBONACEOUS_CLASSES = ("carbonaceous", "carbonaceous mixed dust", "dust-carbonaceous")
+# Existing behavior groups all of these elemental masses into reconstructed OIN.
+# Stoichiometric oxygen is allocated for Mg/Al/Si/K/Ca/Fe/Mn/Cu, while Zn is
+# included in OIN without an additional oxygen allocation.
 _DEFAULT_DUST_ELEMENTS = ("Mg", "Al", "Si", "K", "Ca", "Fe", "Mn", "Zn", "Cu")
 _BIO_DUST_ELEMENTS = ("Al", "Si")
 
+# Elemental molar masses used by EDX stoichiometric reconstruction.
+# Only elements needed by the oxygen-allocation formulas are listed here;
+# these are not AerosolSpecies properties.
+_ELEMENT_MOLAR_MASS_KG_PER_MOL = {
+    "O": 16.0e-3,
+    "Mn": 54.94e-3,
+    "Fe": 55.85e-3,
+    "Mg": 24.305e-3,
+    "Al": 27.0e-3,
+    "Si": 28.085e-3,
+    "K": 39.09e-3,
+    "Ca": 40.078e-3,
+    "S": 32.065e-3,
+    "Cu": 63.55e-3,
+}
 
-class ElementMasses:
-    """Element molar masses used by EDX reconstruction assumptions."""
+_DEFAULT_EDX_RECONSTRUCTION_SCHEME = "sulfate_oxide_organic_allocation"
+_EDX_TARGET_SPECIES = {
+    "sulfate": "SO4",
+    "dust": "OIN",
+    "organic": "OC",
+    "sodium": "Na",
+    "chloride": "Cl",
+    "biological": "biological",
+}
+_DEFAULT_EDX_TARGET_SPECIES = (
+    _EDX_TARGET_SPECIES["sulfate"],
+    _EDX_TARGET_SPECIES["dust"],
+    _EDX_TARGET_SPECIES["organic"],
+    _EDX_TARGET_SPECIES["sodium"],
+    _EDX_TARGET_SPECIES["chloride"],
+    _EDX_TARGET_SPECIES["biological"],
+)
 
-    def __init__(self):
-        self.O = 16.0e-3
-        self.Mn = 54.94e-3
-        self.Fe = 55.85e-3
-        self.Mg = 24.305e-3
-        self.Al = 27.0e-3
-        self.Si = 28.085e-3
-        self.K = 39.09e-3
-        self.Ca = 40.078e-3
-        self.S = 32.065e-3
-        self.Na = 22.99e-3
-        self.Cl = 35.45e-3
-        self.Cu = 63.55e-3
 
+@dataclass(eq=False)
+class EdxElementMassFractions:
+    """Elemental EDX composition and particle attributes read from an input file."""
 
-class Population_MassFracs:
-    def __init__(self, diameters, elements, mass_fractions, ptypes):
-        self.D = diameters
-        self.elements = elements
-        self.mass_fractions = mass_fractions
-        self.ptype = ptypes
+    D: np.ndarray
+    elements: np.ndarray
+    mass_fractions: np.ndarray
+    ptype: np.ndarray
 
 
 def _validate_csv_extension(filename: str) -> None:
@@ -106,23 +136,30 @@ def _element_mass_fraction_dict(elements, mass_fraction) -> dict:
     return dict(zip(elements, mass_fraction))
 
 
-def _default_dust_oxygen_fraction(data_dict: dict, molec_masses: ElementMasses) -> float:
+def _sulfate_oxygen_from_sulfur(data_dict: dict) -> float:
+    masses = _ELEMENT_MOLAR_MASS_KG_PER_MOL
+    return data_dict['S'] * ((4 * masses['O']) / masses['S'])
+
+
+def _oxide_oxygen_for_default_dust(data_dict: dict) -> float:
+    masses = _ELEMENT_MOLAR_MASS_KG_PER_MOL
     return (
-        data_dict['Mg'] * (molec_masses.O / molec_masses.Mg)
-        + data_dict['Al'] * ((3 * molec_masses.O) / (2 * molec_masses.Al))
-        + data_dict['Si'] * ((2 * molec_masses.O) / molec_masses.Si)
-        + data_dict['K'] * (molec_masses.O / (2 * molec_masses.K))
-        + data_dict['Ca'] * (molec_masses.O / molec_masses.Ca)
-        + data_dict['Fe'] * ((3 * molec_masses.O) / (2 * molec_masses.Fe))
-        + data_dict['Mn'] * (molec_masses.O / molec_masses.Mn)
-        + data_dict['Cu'] * (molec_masses.O / molec_masses.Cu)
+        data_dict['Mg'] * (masses['O'] / masses['Mg'])
+        + data_dict['Al'] * ((3 * masses['O']) / (2 * masses['Al']))
+        + data_dict['Si'] * ((2 * masses['O']) / masses['Si'])
+        + data_dict['K'] * (masses['O'] / (2 * masses['K']))
+        + data_dict['Ca'] * (masses['O'] / masses['Ca'])
+        + data_dict['Fe'] * ((3 * masses['O']) / (2 * masses['Fe']))
+        + data_dict['Mn'] * (masses['O'] / masses['Mn'])
+        + data_dict['Cu'] * (masses['O'] / masses['Cu'])
     )
 
 
-def _bio_dust_oxygen_fraction(data_dict: dict, molec_masses: ElementMasses) -> float:
+def _oxide_oxygen_for_biological_dust_coating(data_dict: dict) -> float:
+    masses = _ELEMENT_MOLAR_MASS_KG_PER_MOL
     return (
-        + data_dict['Al'] * ((3 * molec_masses.O) / (2 * molec_masses.Al))
-        + data_dict['Si'] * ((2 * molec_masses.O) / molec_masses.Si)
+        + data_dict['Al'] * ((3 * masses['O']) / (2 * masses['Al']))
+        + data_dict['Si'] * ((2 * masses['O']) / masses['Si'])
     )
 
 
@@ -142,10 +179,12 @@ def _assign_species_or_raise(sampled_masses, aerospecs, species_name, value, mis
 
 
 def _assign_nacl_or_raise(sampled_masses, aerospecs, data_dict):
+    sodium = _EDX_TARGET_SPECIES["sodium"]
+    chloride = _EDX_TARGET_SPECIES["chloride"]
     try:
-        idx = np.where(aerospecs == 'Na')[0][0]
+        idx = np.where(aerospecs == sodium)[0][0]
         sampled_masses[idx] = data_dict['Na']
-        idx = np.where(aerospecs == 'Cl')[0][0]
+        idx = np.where(aerospecs == chloride)[0][0]
         sampled_masses[idx] = data_dict['Cl']
     except:
         raise ValueError(f"Could not find Na or Cl in provided aerospecs: {aerospecs}")
@@ -159,7 +198,7 @@ def _normalize_or_raise(sampled_masses):
         raise ValueError(f"Sampled mass fractions sum to {np.sum(sampled_masses)}.")
 
 
-def read_edx_file(config: Dict[str, Any], elements: list[str]) -> Population_MassFracs:
+def read_edx_file(config: Dict[str, Any], elements: list[str]) -> EdxElementMassFractions:
     filename = config["edx_file"]
     _validate_csv_extension(filename)
     data = pd.read_csv(filename)
@@ -168,41 +207,44 @@ def read_edx_file(config: Dict[str, Any], elements: list[str]) -> Population_Mas
     particle_diameters = _extract_particle_diameters(data, filename)
     ptypes = _extract_particle_classes(data, filename)
 
-    return Population_MassFracs(particle_diameters, elements, particle_massfracs, ptypes)
+    return EdxElementMassFractions(particle_diameters, elements, particle_massfracs, ptypes)
 
 
 def sample_particle(aerospecs: list[str], mass_fraction: np.ndarray, elements: np.ndarray) -> np.ndarray:
     aerospecs = np.array(aerospecs)
     sampled_masses = np.zeros(len(aerospecs))
     data_dict = _element_mass_fraction_dict(elements, mass_fraction)
-    molec_masses = ElementMasses()
 
     # Assume sulfur is sulfate (SO4) and cap sulfate oxygen by available oxygen.
-    sulfate_O_fraction = data_dict['S'] * ((4 * molec_masses.O) / molec_masses.S)
+    sulfate_O_fraction = _sulfate_oxygen_from_sulfur(data_dict)
     if sulfate_O_fraction <= data_dict['O']:
         sulfate_mass_fraction = data_dict['S'] + sulfate_O_fraction
     else:
         sulfate_mass_fraction = data_dict['S'] + data_dict['O']
         sulfate_O_fraction = data_dict['O']
+    sulfate = _EDX_TARGET_SPECIES["sulfate"]
     _assign_species_or_raise(
         sampled_masses,
         aerospecs,
-        'SO4',
+        sulfate,
         sulfate_mass_fraction,
-        f"Could not find SO4 in provided aerospecs: {aerospecs}",
+        f"Could not find {sulfate} in provided aerospecs: {aerospecs}",
     )
 
-    # Dust oxides from Mg/Al/Si/K/Ca/Fe/Mn are oxygen-limited by remaining oxygen.
-    dust_O_fraction = _default_dust_oxygen_fraction(data_dict, molec_masses)
+    # Mg/Al/Si/K/Ca/Fe/Mn/Cu receive stoichiometric oxide oxygen; Zn is
+    # grouped into OIN without additional oxygen. Total dust oxygen is capped
+    # by measured oxygen remaining after sulfate allocation.
+    dust_O_fraction = _oxide_oxygen_for_default_dust(data_dict)
     if sulfate_O_fraction + dust_O_fraction > data_dict['O']:
         dust_O_fraction = data_dict['O'] - sulfate_O_fraction
     dust_mass_fraction = _dust_mass_fraction(data_dict, dust_O_fraction, _DEFAULT_DUST_ELEMENTS)
+    dust = _EDX_TARGET_SPECIES["dust"]
     _assign_species_or_raise(
         sampled_masses,
         aerospecs,
-        'OIN',
+        dust,
         dust_mass_fraction,
-        f"Could not find OIN in provided aerospecs: {aerospecs}",
+        f"Could not find {dust} in provided aerospecs: {aerospecs}",
     )
 
     # Remaining C/N/P/O mass is treated as organic carbon (OC).
@@ -210,12 +252,13 @@ def sample_particle(aerospecs: list[str], mass_fraction: np.ndarray, elements: n
         data_dict['C'] + data_dict['N'] + data_dict['P']
         + data_dict['O'] - sulfate_O_fraction - dust_O_fraction
     )
+    organic = _EDX_TARGET_SPECIES["organic"]
     _assign_species_or_raise(
         sampled_masses,
         aerospecs,
-        'OC',
+        organic,
         organic_mass_fraction,
-        f"Could not find OC in provided aerospecs: {aerospecs}",
+        f"Could not find {organic} in provided aerospecs: {aerospecs}",
     )
 
     # Na and Cl are assigned directly to Na/Cl species masses.
@@ -230,35 +273,38 @@ def sample_bio_particle(aerospecs: list[str], mass_fraction: np.ndarray, element
     aerospecs = np.array(aerospecs)
     sampled_masses = np.zeros(len(aerospecs))
     data_dict = _element_mass_fraction_dict(elements, mass_fraction)
-    molec_masses = ElementMasses()
 
-    # Al/Si are treated as dust coating (oxides), capped by available oxygen.
-    dust_O_fraction = _bio_dust_oxygen_fraction(data_dict, molec_masses)
+    # Al/Si are treated as a dust coating (oxides), with oxygen allocation
+    # capped by the measured oxygen available to the particle.
+    dust_O_fraction = _oxide_oxygen_for_biological_dust_coating(data_dict)
     if dust_O_fraction > data_dict['O']:
         dust_O_fraction = data_dict['O']
     dust_mass_fraction = _dust_mass_fraction(data_dict, dust_O_fraction, _BIO_DUST_ELEMENTS)
+    dust = _EDX_TARGET_SPECIES["dust"]
     _assign_species_or_raise(
         sampled_masses,
         aerospecs,
-        'OIN',
+        dust,
         dust_mass_fraction,
-        f"Could not find OIN in provided aerospecs: {aerospecs}",
+        f"Could not find {dust} in provided aerospecs: {aerospecs}",
     )
 
     # Na and Cl are assigned directly to Na/Cl species masses.
     _assign_nacl_or_raise(sampled_masses, aerospecs, data_dict)
 
-    # Biological remainder: C/N/P/S/K/Mg/Ca/Fe/Mn/Zn/Cu plus remaining oxygen.
+    # Biological remainder: C/N/P/S/K/Mg/Ca/Fe/Mn/Zn/Cu plus oxygen not
+    # allocated to the Al/Si dust coating.
     bio_mass_fraction = (
         + data_dict['C'] + data_dict['N'] + data_dict['P']
         + data_dict['S'] + data_dict['K'] + data_dict['Mg']
         + data_dict['Ca'] + data_dict['Fe'] + data_dict['Mn']
         + data_dict['Zn'] + data_dict['Cu'] + data_dict['O'] - dust_O_fraction
     )
+    biological = _EDX_TARGET_SPECIES["biological"]
     _assign_species_or_raise(
         sampled_masses,
         aerospecs,
-        'biological',
+        biological,
         bio_mass_fraction,
         f"Could not find bio in provided aerospecs: {aerospecs}",
     )
@@ -272,19 +318,21 @@ def sample_carbonaceous_particle(aerospecs: list[str], mass_fraction: np.ndarray
     aerospecs = np.array(aerospecs)
     sampled_masses = np.zeros(len(aerospecs))
     data_dict = _element_mass_fraction_dict(elements, mass_fraction)
-    molec_masses = ElementMasses()
 
-    # Dust oxides are formed similarly to default particles, capped by oxygen.
-    dust_O_fraction = _default_dust_oxygen_fraction(data_dict, molec_masses)
+    # The carbonaceous branch uses the same OIN elemental grouping and oxide
+    # allocation as the default branch, but no oxygen is reserved for sulfate.
+    # Dust oxygen is therefore capped only by the particle's measured oxygen.
+    dust_O_fraction = _oxide_oxygen_for_default_dust(data_dict)
     if dust_O_fraction > data_dict['O']:
         dust_O_fraction = data_dict['O']
     dust_mass_fraction = _dust_mass_fraction(data_dict, dust_O_fraction, _DEFAULT_DUST_ELEMENTS)
+    dust = _EDX_TARGET_SPECIES["dust"]
     _assign_species_or_raise(
         sampled_masses,
         aerospecs,
-        'OIN',
+        dust,
         dust_mass_fraction,
-        f"Could not find OIN in provided aerospecs: {aerospecs}",
+        f"Could not find {dust} in provided aerospecs: {aerospecs}",
     )
 
     # Current behavior: sulfur is not assigned to SO4 in this branch; it is included in OC.
@@ -292,12 +340,13 @@ def sample_carbonaceous_particle(aerospecs: list[str], mass_fraction: np.ndarray
         data_dict['C'] + data_dict['N'] + data_dict['P']
         + data_dict['S'] + data_dict['O'] - dust_O_fraction
     )
+    organic = _EDX_TARGET_SPECIES["organic"]
     _assign_species_or_raise(
         sampled_masses,
         aerospecs,
-        'OC',
+        organic,
         organic_mass_fraction,
-        f"Could not find OC in provided aerospecs: {aerospecs}",
+        f"Could not find {organic} in provided aerospecs: {aerospecs}",
     )
 
     # Na and Cl are assigned directly to Na/Cl species masses.
@@ -308,12 +357,16 @@ def sample_carbonaceous_particle(aerospecs: list[str], mass_fraction: np.ndarray
     return sampled_masses
 
 
-def reconstruct_edx_species_mass_fractions(raw_population, aero_spec_names):
+def reconstruct_edx_species_mass_fractions(
+    raw_population: EdxElementMassFractions,
+    aero_spec_names: list[str],
+) -> tuple[np.ndarray, list[str]]:
+    """Reconstruct aerosol-species mass fractions from elemental EDX input."""
     particle_classes = []
     aero_spec_masses = np.zeros((len(raw_population.ptype), len(aero_spec_names)))
     for ii, (ptype, mass_fracs) in enumerate(zip(raw_population.ptype, raw_population.mass_fractions)):
         particle_classes.append(ptype)
-        
+
         if ptype == 'biological':
             aero_spec_masses[ii] = sample_bio_particle(aero_spec_names, mass_fracs, raw_population.elements)
         elif ptype in _CARBONACEOUS_CLASSES or "organics" in ptype:
