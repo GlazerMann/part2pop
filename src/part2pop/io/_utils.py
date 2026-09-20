@@ -27,7 +27,14 @@ def make_json_safe(value: Any) -> Any:
 
 
 def _encode_population_metadata(value: Any, array_store: Dict[str, np.ndarray]) -> Any:
-    """Encode population metadata while preserving NumPy arrays."""
+    """Encode supported population metadata into JSON-safe descriptors.
+
+    Mappings use string keys, tuples/lists become lists, NumPy scalars become
+    Python scalars, and non-object NumPy arrays are stored separately in the
+    NPZ array store for lossless restoration. Object-dtype arrays are rejected
+    because loading uses ``allow_pickle=False``. Other unsupported objects are
+    stringified, matching :func:`make_json_safe`.
+    """
     if isinstance(value, Mapping):
         return {
             _POPULATION_METADATA_MAPPING_TAG: {
