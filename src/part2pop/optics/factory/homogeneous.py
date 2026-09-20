@@ -109,7 +109,10 @@ class HomogeneousParticle(OpticalParticle):
         """Return Rayleigh Cext, Csca, Cabs, and g for a homogeneous sphere.
 
         This is the small-particle approximation and is most accurate when
-        x = 2*pi*r/lambda << 1.
+        x = 2*pi*r/lambda << 1. The cross-sections use the standard Rayleigh
+        homogeneous-sphere result with K = (m**2 - 1) / (m**2 + 2); see
+        Bohren and Huffman, Absorption and Scattering of Light by Small
+        Particles, Chapter 5.
         """
         k = 2.0 * math.pi / wavelength_m
         m2 = m * m
