@@ -52,6 +52,38 @@ def test_rayleigh_matches_mie_in_small_particle_limit():
     assert g == pytest.approx(0.0)
 
 
+@pytest.mark.skipif(
+    homogeneous.MieQ is None,
+    reason=f"PyMieScatt not available: {homogeneous._PMS_ERR}",
+)
+def test_rayleigh_matches_mie_for_absorbing_particle_in_small_particle_limit():
+    refractive_index = complex(1.5, 0.02)
+    wavelength_m = 550e-9
+    radius_m = 5e-9
+
+    cext, csca, cabs, g = HomogeneousParticle._rayleigh_cross_sections(
+        m=refractive_index,
+        wavelength_m=wavelength_m,
+        radius_m=radius_m,
+    )
+
+    diameter_nm = 2.0 * radius_m * 1e9
+    wavelength_nm = wavelength_m * 1e9
+    mie = homogeneous.MieQ(
+        refractive_index,
+        wavelength_nm,
+        diameter_nm,
+        asDict=True,
+        asCrossSection=False,
+    )
+    geometric_area = math.pi * radius_m**2
+
+    assert csca == pytest.approx(mie["Qsca"] * geometric_area, rel=0.02)
+    assert cabs == pytest.approx(mie["Qabs"] * geometric_area, rel=0.02)
+    assert cext == pytest.approx(mie["Qext"] * geometric_area, rel=0.02)
+    assert g == pytest.approx(0.0)
+
+
 def test_rayleigh_fallback_warning_reports_actual_size_parameter(monkeypatch):
     monkeypatch.setattr(homogeneous, "MieQ", None)
 
