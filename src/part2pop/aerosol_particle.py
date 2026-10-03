@@ -28,8 +28,10 @@ class Particle:
     ----------
     species : tuple[AerosolSpecies,...]
         Sequence of species objects that make up the particle.
-    masses : tuple[float,...]
-        Mass of each species in SI units (kg).
+    masses : numpy.ndarray
+        One-dimensional mass array in SI units (kg). Construction copies the
+        supplied mass values so later mutation of the input does not affect
+        the particle.
 
     Methods provide convenient accessors for dry/wet diameters, volumes,
     effective kappa, and critical supersaturation.
