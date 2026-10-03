@@ -84,17 +84,19 @@ def test_rayleigh_matches_mie_for_absorbing_particle_in_small_particle_limit():
     assert g == pytest.approx(0.0)
 
 
-def test_rayleigh_fallback_warning_reports_actual_size_parameter(monkeypatch):
+def test_rayleigh_fallback_rejects_large_size_parameter(monkeypatch):
     monkeypatch.setattr(homogeneous, "MieQ", None)
 
-    with pytest.warns(RuntimeWarning) as seen:
-        HomogeneousParticle(
-            _base_particle(),
-            {"wvl_grid": [550e-9], "rh_grid": [0.0]},
-        )
-
-    messages = [str(item.message) for item in seen]
-    assert any("Rayleigh-sphere approximation" in message for message in messages)
-    assert any("maximum particle size parameter" in message for message in messages)
-    assert any("x=" in message for message in messages)
-
+    with pytest.warns(RuntimeWarning, match="Rayleigh-sphere approximation"):
+        with pytest.raises(
+            ValueError,
+            match=r"outside its supported small-particle regime: x=.*must be < 0\.1",
+        ):
+            HomogeneousParticle(
+                _base_particle(),
+                {
+                    "wvl_grid": [550e-9],
+                    "rh_grid": [0.0],
+                    "allow_rayleigh_fallback": True,
+                },
+            )

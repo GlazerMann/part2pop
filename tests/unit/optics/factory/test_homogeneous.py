@@ -8,12 +8,12 @@ from part2pop.population.builder import build_population
 from part2pop.optics.factory.homogeneous import HomogeneousParticle, build, _PMS_ERR
 
 
-def _base_particle():
+def _base_particle(diameter_m=0.05e-6):
     cfg_pop = {
         "type": "monodisperse",
         "aero_spec_names": [["BC", "SO4", "H2O"]],
         "N": [1.0e6],
-        "D": [0.05e-6],
+        "D": [diameter_m],
         "aero_spec_fracs": [[0.2, 0.7, 0.1]],
     }
     pop = build_population(cfg_pop)
@@ -46,7 +46,22 @@ def test_rayleigh_cross_sections_absorbing_particle():
     assert g == pytest.approx(0.0)
 
 
-def test_missing_pymiescatt_warns_and_uses_rayleigh_fallback(monkeypatch):
+def test_missing_pymiescatt_requires_explicit_rayleigh_opt_in(monkeypatch):
+    monkeypatch.setattr(homogeneous, "MieQ", None)
+    monkeypatch.setattr(
+        homogeneous,
+        "_PMS_ERR",
+        ImportError("simulated missing PyMieScatt"),
+    )
+
+    with pytest.raises(ImportError, match="allow_rayleigh_fallback=True"):
+        HomogeneousParticle(
+            _base_particle(),
+            {"wvl_grid": [550e-9], "rh_grid": [0.0]},
+        )
+
+
+def test_explicit_rayleigh_fallback_warns_and_computes(monkeypatch):
     monkeypatch.setattr(homogeneous, "MieQ", None)
     monkeypatch.setattr(
         homogeneous,
@@ -56,11 +71,15 @@ def test_missing_pymiescatt_warns_and_uses_rayleigh_fallback(monkeypatch):
 
     with pytest.warns(
         RuntimeWarning,
-        match="PyMieScatt is unavailable.*Rayleigh-sphere approximation",
+        match="explicitly enabled.*Rayleigh-sphere approximation",
     ):
         hp = HomogeneousParticle(
-            _base_particle(),
-            {"wvl_grid": [550e-9], "rh_grid": [0.0]},
+            _base_particle(diameter_m=10e-9),
+            {
+                "wvl_grid": [550e-9],
+                "rh_grid": [0.0],
+                "allow_rayleigh_fallback": True,
+            },
         )
 
     assert np.isfinite(hp.Cext[0, 0])
