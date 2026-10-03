@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "paper/**"
+      - "!paper/paper.pdf"
       - ".github/workflows/draft-pdf.yml"
 
 permissions:
@@ -52,7 +53,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "docs: update draft JOSS paper PDF [skip ci]"
+          git commit -m "docs: update draft JOSS paper PDF"
           # A human or another workflow may have advanced main while the PDF
           # was building. Rebase rather than force-pushing or failing with a
           # stale checkout.
