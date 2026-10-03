@@ -200,10 +200,8 @@ def get_mam_input(varname,mam_input_filename):
             UserWarning,
             stacklevel=2,
         )
-  
+
     elif yep > 1:
-        raise ValueError(
-            f"more than one line in {mam_input_filename!r} starts with {varname!r}"
-        )
+        raise ValueError('more than one line in ', mam_input_filename, 'starts with', varname)
 
     return vardat
