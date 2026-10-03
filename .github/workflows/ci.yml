@@ -7,8 +7,6 @@ on:
       - "feature/**"
       - "features/**"
       - "debug/**"
-    tags:
-      - "v*"
   pull_request:
     branches: [main]
   schedule:
@@ -21,9 +19,7 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  # Superseded branch/PR CI should stop, but a release-tag run must never be
-  # cancelled automatically once verification or publication has started.
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+  cancel-in-progress: true
 
 env:
   MPLBACKEND: Agg
@@ -99,30 +95,6 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Verify release tag matches project version
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          python - <<'PY'
-          import os
-          from pathlib import Path
-          import tomllib
-
-          version = tomllib.loads(
-              Path("pyproject.toml").read_text(encoding="utf-8")
-          )["project"]["version"]
-
-          expected_tag = f"v{version}"
-          actual_tag = os.environ["RELEASE_TAG"]
-
-          if actual_tag != expected_tag:
-              raise SystemExit(
-                  f"Release tag {actual_tag!r} must match "
-                  f"project version {expected_tag!r}"
-              )
-          PY
-
       - name: Install build and test tools
         run: |
           python -m pip install --upgrade pip
@@ -162,33 +134,3 @@ jobs:
           PY
 
           python -m pytest tests/integration
-
-      - name: Upload verified release distributions
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: distributions
-          path: dist/*
-          if-no-files-found: error
-          retention-days: 7
-
-  publish:
-    name: Publish distributions
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: distributions
-
-    permissions:
-      contents: read
-      id-token: write
-
-    steps:
-      - name: Download verified distributions
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: distributions
-          path: dist
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
