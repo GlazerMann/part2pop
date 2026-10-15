@@ -53,6 +53,9 @@ def build(config):
     for i, (names, fractions) in enumerate(zip(name_rows, aero_spec_fracs)):
         if len(names) != len(fractions) or len(set(names)) != len(names):
             raise ValueError(f"Particle {i} has mismatched or duplicate species names/fractions")
+        # Fractions are positional within each particle's resolved species row,
+        # not within the population-wide species ordering. Map by canonical name;
+        # absent species contribute zero mass fraction for that particle.
         fraction_by_name = dict(zip(names, fractions))
         aligned_fractions = [fraction_by_name.get(name, 0.0) for name in pop_species_names]
         particle = make_particle(
