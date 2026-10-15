@@ -212,7 +212,9 @@ class OpticalPopulation(ParticlePopulation):
             wvl_idx = slice(None)
         else:
             arr = np.asarray(self.wvl_grid)
-            hits = np.where(np.isclose(arr, wvl))[0]
+            # Default np.isclose(atol=1e-8) treats distinct visible
+            # wavelengths less than 10 nm apart as interchangeable.
+            hits = np.where(np.isclose(arr, wvl, rtol=1e-7, atol=0.0))[0]
             if len(hits) == 0:
                 raise ValueError(f"Wavelength {wvl} not found in wvl_grid {self.wvl_grid}")
             wvl_idx = int(hits[0])
