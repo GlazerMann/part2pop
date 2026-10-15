@@ -54,7 +54,7 @@ class avgJhetVar(PopulationVariable):
         for ii, T in enumerate(T_grid):
             arr[ii] = freezing_pop.get_avg_Jhet(T, freezing_config)
         if as_dict:
-            return {"T_grid": np.asarray(T_grid), "T_units": T_grid, "avg_Jhet": arr}
+            return {"T_grid": np.asarray(T_grid), "T_units": "K", "avg_Jhet": arr}
         return arr
 
 
