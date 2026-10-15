@@ -8,8 +8,8 @@ import numpy as np
 class NucleatingSites(PopulationVariable):
     meta = VariableMeta(
         name="nucleating_sites",
-        description='Ice-nucleation active site density.',
-        units = r'm$^{2}$/m$^{3}$',
+        description='Cumulative heterogeneous ice-nucleation active sites per surface area during cooling.',
+        units = r'm$^{-2}$',
         axis_names=("T_grid",),
         default_cfg={},
         aliases = ('n_s',),
@@ -28,7 +28,9 @@ class NucleatingSites(PopulationVariable):
             "T_units": units
         }
         freezing_pop = build_freezing_population(population, freezing_cfg)
-        arr = freezing_pop.get_nucleating_sites(cfg["cooling_rate"])
+        arr = freezing_pop.get_nucleating_sites(
+            cfg["T_grid"], cfg["cooling_rate"], freezing_cfg, T_units=units
+        )
         if as_dict:
             return {"T_grid": np.asarray(cfg["T_grid"]), "cooling_rate": cfg["cooling_rate"],
                     "T_units": cfg.get("T_units", "K"), "nucleating_sites": arr,}
