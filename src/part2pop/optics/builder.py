@@ -62,6 +62,9 @@ def build_optical_population(base_population, config):
     # and centralizes the decision point where the wavelength grid is known.
     # Prefer species_modifications from optics config; if absent, fall back to
     # the base population's recorded modifications (set by population builders).
+    # A supplied mapping, including {}, is authoritative. An omitted mapping
+    # inherits the base population's species modifications. This lets callers
+    # deliberately reset inherited optical overrides to species defaults.
     species_mods = config.get(
         'species_modifications',
         getattr(base_population, 'species_modifications', {})
