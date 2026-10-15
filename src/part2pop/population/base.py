@@ -1,6 +1,7 @@
 # src/part2pop/population/base.py
 
 from dataclasses import dataclass, field
+from copy import deepcopy
 from typing import Tuple, Dict, Optional
 from warnings import warn
 import numpy as np
@@ -130,8 +131,12 @@ class ParticlePopulation:
         )
             
     def clone_detached(self):
-        """Return a copy that shares immutable data but has detached numeric arrays."""
+        """Return a population whose arrays and mutable state are independent."""
         return ParticlePopulation(
-            species=self.species, spec_masses=self.spec_masses.copy(),
-            num_concs=self.num_concs.copy(), ids=self.ids, classes=self.classes, species_modifications=self.species_modifications
+            species=deepcopy(self.species),
+            spec_masses=np.array(self.spec_masses, copy=True),
+            num_concs=np.array(self.num_concs, copy=True),
+            ids=deepcopy(self.ids),
+            classes=deepcopy(self.classes),
+            species_modifications=deepcopy(self.species_modifications),
         )
