@@ -34,33 +34,31 @@ def build(config):
     N_parts_cfg = config.get("N_parts", 100)
     specdata_path = config.get("specdata_path", None)
 
-    if isinstance(N_parts_cfg, list) or isinstance(N_parts_cfg, tuple):
-        N_parts_list = np.array(N_parts_cfg, dtype=int)
+    if not np.all(np.isfinite(N_list)) or np.any(N_list < 0) or N_list.sum() <= 0:
+        raise ValueError("Mode number concentrations must be finite, nonnegative, and have positive total.")
+
+    if isinstance(N_parts_cfg, (list, tuple)):
+        N_parts_list = np.asarray(N_parts_cfg, dtype=int)
+        if np.any(N_parts_list <= 0):
+            raise ValueError("Each mode must have a positive N_parts count.")
     else:
-        # scalar total samples
         N_parts_total = int(N_parts_cfg)
         if N_parts_total <= 0:
             raise ValueError("N_parts must be positive.")
+        n_modes = len(N_list)
+        if N_parts_total < n_modes:
+            raise ValueError("N_parts must be at least the number of modes so each mode has a sample.")
 
-        # probabilities per mode, proportional to mode number concentration
-        p = N_list / N_list.sum()
-        N_parts_list = np.round(p * N_parts_total).astype(int)
-
-        # Make sure we don't drop any modes and that the sum matches exactly
-        # (adjust by distributing the rounding error).
-        N_parts_list = np.maximum(N_parts_list, 1)
-        diff = N_parts_total - int(N_parts_list.sum())
-        # distribute diff one by one
-        i = 0
-        while diff != 0:
-            if diff > 0:
-                N_parts_list[i % len(N_parts_list)] += 1
-                diff -= 1
-            else:  # diff < 0
-                if N_parts_list[i % len(N_parts_list)] > 1:
-                    N_parts_list[i % len(N_parts_list)] -= 1
-                    diff += 1
-            i += 1
+        # Reserve one sample per mode, then apportion the remaining samples
+        # by largest remainder. This has a strict O(n_modes log n_modes) bound.
+        remaining = N_parts_total - n_modes
+        quotas = (N_list / N_list.sum()) * remaining
+        extra = np.floor(quotas).astype(int)
+        remainder = remaining - int(extra.sum())
+        if remainder:
+            priority = np.argsort(-(quotas - extra), kind="stable")
+            extra[priority[:remainder]] += 1
+        N_parts_list = extra + 1
 
     aero_spec_names_list = config["aero_spec_names"]
     aero_spec_fracs_list = config["aero_spec_fracs"]
