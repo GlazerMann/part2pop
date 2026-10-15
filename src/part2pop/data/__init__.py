@@ -11,10 +11,11 @@ def _read_dataset(filename: str, encoding: str) -> str:
         return f.read()
 
 def open_dataset(filename: str, encoding: str = "utf-8") -> TextIO:
-    """Return a fresh text stream over cached package-data contents.
+    """Return a new text stream over cached packaged resource contents.
 
-    The public contract is a readable text stream with an independent cursor
-    and lifetime on every call. Callers must not rely on OS-backed file
-    attributes such as ``name`` or ``fileno()``.
+    Cache entries are keyed by (filename, encoding), with up to 32 entries;
+    resources are assumed immutable for the process lifetime. The stream has
+    its own cursor and is not a real OS file handle. Runtime disk changes may
+    not be seen until the underlying cache is cleared or the process restarts.
     """
     return io.StringIO(_read_dataset(filename, encoding))
