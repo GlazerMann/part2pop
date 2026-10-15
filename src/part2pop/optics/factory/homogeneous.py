@@ -32,7 +32,10 @@ class HomogeneousParticle(OpticalParticle):
 
     Optional config (read by OpticalParticle or here):
       - rh_grid, wvl_grid, temp (K), specdata_path, species_modifications
-      - single_scatter_albedo (fallback SSA when PyMieScatt is unavailable; default: 0.9)
+      - allow_rayleigh_fallback (boolean, default False; Rayleigh opt-in)
+
+    A legacy single_scatter_albedo attribute is retained but unused by both
+    the Mie and Rayleigh calculations. It does not select a fallback.
 
     If PyMieScatt is unavailable, construction fails unless the explicit
     Rayleigh fallback is enabled.
@@ -47,7 +50,8 @@ class HomogeneousParticle(OpticalParticle):
         # guarded and will no-op if the species already have wavelength-aware
         # RIs. Keep the call to the base preparation intact.
 
-        # User-tunable fallback SSA (only used if PyMieScatt is missing)
+        # Retain the legacy SSA attribute for compatibility only; neither the
+        # Mie nor Rayleigh calculations use it.
         self.single_scatter_albedo = float(config.get("single_scatter_albedo", 0.9))
 
         # Precompute geometry & per-wavelength dry/water RIs
