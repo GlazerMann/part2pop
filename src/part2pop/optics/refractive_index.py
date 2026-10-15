@@ -124,6 +124,26 @@ def build_refractive_index(spec, wvl_grid, modifications=None):
     return spec
 
 
+def ensure_refractive_index(spec, wvl_grid, modifications=None):
+    """Reuse a species RI only when the grid and effective parameters match."""
+    modifications = modifications or {}
+    existing = getattr(spec, "refractive_index", None)
+    grid = np.asarray(wvl_grid, dtype=float)
+    if (existing is not None
+            and callable(getattr(existing, "real_ri_fun", None))
+            and callable(getattr(existing, "imag_ri_fun", None))
+            and getattr(existing, "wvls", None) is not None
+            and np.array_equal(np.asarray(existing.wvls), grid)):
+        if spec.name.upper() == "H2O":
+            return spec
+        desired = get_RI_params(spec.name)
+        desired.update({k: v for k, v in modifications.items() if k in desired})
+        current = getattr(existing, "RI_params", None)
+        if current == desired or (current is None and not modifications):
+            return spec
+    return build_refractive_index(spec, grid, modifications=modifications)
+
+
 # # optics/refractive_index.py
 # from functools import lru_cache
 # import numpy as np
