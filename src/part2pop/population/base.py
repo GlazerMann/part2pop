@@ -131,7 +131,13 @@ class ParticlePopulation:
         )
             
     def clone_detached(self):
-        """Return a population whose arrays and mutable state are independent."""
+        """Return a base ParticlePopulation with detached standard mutable fields.
+
+        Deep-copy species, identifiers, classes and species modifications, and copy
+        numeric arrays. Dynamic attributes, arbitrary metadata and subclass fields
+        are not copied; the returned object is a ParticlePopulation, not necessarily
+        the same subclass as the source.
+        """
         return ParticlePopulation(
             species=deepcopy(self.species),
             spec_masses=np.array(self.spec_masses, copy=True),
