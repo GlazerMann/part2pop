@@ -99,12 +99,15 @@ class FreezingPopulation(ParticlePopulation):
         return np.average(Jhets, weights=weights)
 
     def get_nucleating_sites(self, T_grid, cooling_rate, config, T_units="K"):
-        """Cumulative heterogeneous active-site density (m^-2) during cooling.
+        """Integrate a cumulative mean heterogeneous nucleation-rate density.
 
-        Assuming a constant positive cooling rate (K/s), integrate the
-        number-and-INSA-weighted mean heterogeneous nucleation rate (m^-2/s)
-        from the warmest temperature to each successively colder temperature.
-        This does not include homogeneous freezing or particle depletion.
+        Assumes a warm-to-cold T_grid and constant positive cooling_rate in K/s.
+        At each T, weight per-particle Jhet (m^-2 s^-1) by number concentration
+        and INSA; divide by total weighted area and integrate -dT/cooling_rate
+        with the trapezoidal rule. The warmest-grid value is zero. Output: m^-2.
+        This excludes homogeneous nucleation, site saturation, frozen-particle
+        removal, and feedback on the rate; this modeled integral is not a direct
+        measurement of unique surface sites.
         """
         temperatures = np.asarray(T_grid, dtype=float)
         if temperatures.ndim != 1 or temperatures.size == 0:
