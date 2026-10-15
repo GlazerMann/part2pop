@@ -125,7 +125,12 @@ def build_refractive_index(spec, wvl_grid, modifications=None):
 
 
 def ensure_refractive_index(spec, wvl_grid, modifications=None):
-    """Reuse a species RI only when the grid and effective parameters match."""
+    """Reuse a mutable species RI when its wavelength grid and effective
+    supported parameters match. Grid equality is exact, not approximate.
+    Nonwater supported parameters are n_550, k_550, alpha_n, and alpha_k.
+    Water uses its tabulated RI and ignores these nonwater parameter overrides.
+    The returned species may be mutated in place; this is not a global cache.
+    """
     modifications = modifications or {}
     existing = getattr(spec, "refractive_index", None)
     grid = np.asarray(wvl_grid, dtype=float)
