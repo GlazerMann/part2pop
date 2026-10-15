@@ -108,7 +108,12 @@ def map_camp_specs(camp_spec_names):
 
 def get_ncfile(partmc_output_dir, timestep, repeat):
 
-    """Find a unique PartMC output matching the requested run and timestep."""
+    """Find exactly one PartMC NetCDF file under the given directory.
+
+    Recursively accept any prefix followed by ``_{repeat:04d}_{timestep:08d}.nc``.
+    Raise FileNotFoundError if absent and ValueError if multiple matches exist;
+    never infer which duplicate is the intended output.
+    """
     partmc_output_dir = Path(partmc_output_dir)
     if not partmc_output_dir.is_dir():
         raise FileNotFoundError(f"PartMC output directory {partmc_output_dir} does not exist.")
