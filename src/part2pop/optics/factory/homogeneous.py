@@ -1,6 +1,7 @@
 # optics/factory/homogeneous.py
 import numpy as np
 import math
+import warnings
 
 from .registry import register
 from ..base import OpticalParticle
@@ -16,6 +17,9 @@ except Exception as e:
     _PMS_ERR = e
 
 
+# Rayleigh theory is an asymptotic small-particle approximation. Keep its
+# opt-in fallback restricted to a deliberately conservative x << 1 regime.
+_RAYLEIGH_MAX_X = 0.1
 
 @register("homogeneous")
 class HomogeneousParticle(OpticalParticle):
@@ -23,13 +27,21 @@ class HomogeneousParticle(OpticalParticle):
     Homogeneous sphere morphology optical particle model with RH and wavelength dependence.
 
     Constructor expects (base_particle, config) to align with the factory builder.
+    Rayleigh fallback must be explicitly enabled with
+    ``allow_rayleigh_fallback=True`` and is restricted to x < 0.1.
 
     Optional config (read by OpticalParticle or here):
       - rh_grid, wvl_grid, temp (K), specdata_path, species_modifications
-    """
+      - allow_rayleigh_fallback (boolean, default False; Rayleigh opt-in)
+    
+        If PyMieScatt is unavailable, construction fails unless the explicit
+        Rayleigh fallback is enabled. single_scatter_albedo is not a fallback
+        control and is not stored by this implementation.
+        """
 
     def __init__(self, base_particle, config):
         super().__init__(base_particle, config)
+        self.allow_rayleigh_fallback = bool(config.get("allow_rayleigh_fallback", False))
 
         # Refractive indices are attached at the population level by the
         # optics builder; the base class's _attach_refractive_indices is
@@ -93,11 +105,62 @@ class HomogeneousParticle(OpticalParticle):
             return complex(1.0, 0.0)
         return (self.h2o_ris[ww] * v_h2o + self.dry_ris[ww] * v_dry) / (v_h2o + v_dry)
 
+    @staticmethod
+    def _rayleigh_cross_sections(m: complex, wavelength_m: float, radius_m: float):
+        """Return Rayleigh Cext, Csca, Cabs, and g for a homogeneous sphere.
+
+        This is the small-particle approximation and is most accurate when
+        x = 2*pi*r/lambda << 1. The cross-sections use the standard Rayleigh
+        homogeneous-sphere result with K = (m**2 - 1) / (m**2 + 2); see
+        Bohren and Huffman, Absorption and Scattering of Light by Small
+        Particles, Chapter 5.
+        """
+        k = 2.0 * math.pi / wavelength_m
+        m2 = m * m
+        polarizability_factor = (m2 - 1.0) / (m2 + 2.0)
+
+        csca = (
+            (8.0 * math.pi / 3.0)
+            * (k ** 4)
+            * (radius_m ** 6)
+            * abs(polarizability_factor) ** 2
+        )
+        cabs = (
+            4.0
+            * math.pi
+            * k
+            * (radius_m ** 3)
+            * max(0.0, float(polarizability_factor.imag))
+        )
+        cext = csca + cabs
+
+        # Rayleigh scattering is symmetric fore/aft, so <cos(theta)> = 0.
+        return cext, csca, cabs, 0.0
+
     def compute_optics(self):
         """
         Compute cross-sections and asymmetry parameter per (RH, wavelength).
-        Prefer PyMieScatt if available; otherwise use a size-parameter-based fallback.
+
+        PyMieScatt is the default solver. Rayleigh is used only when explicitly
+        enabled and every evaluated size parameter remains below
+        _RAYLEIGH_MAX_X.
         """
+        if MieQ is None:
+            if not self.allow_rayleigh_fallback:
+                error = ImportError(
+                    "PyMieScatt is required for homogeneous optics. "
+                    "Set allow_rayleigh_fallback=True only to opt into the "
+                    f"Rayleigh approximation for x < {_RAYLEIGH_MAX_X:g}."
+                )
+                if _PMS_ERR is not None:
+                    raise error from _PMS_ERR
+                raise error
+            warnings.warn(
+                "PyMieScatt is unavailable; using the explicitly enabled "
+                "Rayleigh-sphere approximation.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
         for rr, rh in enumerate(self.rh_grid):
             D_m = float(self.get_Dwet(RH=float(rh), T=self.temp, sigma_sa=self.get_surface_tension()))
@@ -113,17 +176,34 @@ class HomogeneousParticle(OpticalParticle):
                 # self.Cext[rr, ww] = out["Qext"] * area
                 # self.Csca[rr, ww] = out["Qsca"] * area
                 # self.Cabs[rr, ww] = out["Qabs"] * area
-                
-                out = MieQ(m, lam_nm, D_nm, asDict=True, asCrossSection=False)
-                # Convert efficiencies to absolute cross sections via geometric area
-                self.Cext[rr, ww] = out["Qext"] * np.pi/4 * D_nm**2 * 1e-18 # from nm^2 to m^2
-                self.Csca[rr, ww] = out["Qsca"] * np.pi/4 * D_nm**2 * 1e-18 # from nm^2 to m^2
-                self.Cabs[rr, ww] = out["Qabs"] * np.pi/4 * D_nm**2 * 1e-18 # from nm^2 to m^2
-                self.g[rr, ww]    = out["g"]
-            # else:
-            #     raise ImportError(
-            #         "PyMieScatt is required for homogeneous sphere optics but is not available")
-    
+
+                if MieQ is not None:
+                    out = MieQ(m, lam_nm, D_nm, asDict=True, asCrossSection=False)
+                    # Convert efficiencies to absolute cross sections.
+                    geom_area = np.pi / 4.0 * D_nm ** 2 * 1e-18 # from nm^2 to m^2
+                    self.Cext[rr, ww] = out["Qext"] * geom_area
+                    self.Csca[rr, ww] = out["Qsca"] * geom_area
+                    self.Cabs[rr, ww] = out["Qabs"] * geom_area
+                    self.g[rr, ww] = out["g"]
+                else:
+                    size_parameter = 2.0 * math.pi * r_m / float(lam_m)
+                    if size_parameter >= _RAYLEIGH_MAX_X:
+                        raise ValueError(
+                            "Rayleigh fallback is outside its supported "
+                            f"small-particle regime: x={size_parameter:.3g} "
+                            f"must be < {_RAYLEIGH_MAX_X:g}."
+                        )
+                    cext, csca, cabs, g = self._rayleigh_cross_sections(
+                        m=m,
+                        wavelength_m=float(lam_m),
+                        radius_m=r_m,
+                    )
+                    self.Cext[rr, ww] = cext
+                    self.Csca[rr, ww] = csca
+                    self.Cabs[rr, ww] = cabs
+                    self.g[rr, ww] = g
+
+
     # Convenience getters (unchanged)
     def get_cross_sections(self):
         return {
