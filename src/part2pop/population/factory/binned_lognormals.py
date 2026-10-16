@@ -21,6 +21,10 @@ def build(config):
     # integer conversion would otherwise turn a value such as 2.5 into 2
     # before this factory can reject it.
     raw_n_bins_config = config.get("N_bins", 100)
+    # This factory validates bin counts below. Do not let the generic
+    # normalizer coerce or reject them before that diagnostic can run.
+    config = dict(config)
+    config.pop("N_bins", None)
     config = normalize_population_config(config)
     # fixme: make this +/- certain number of sigmas (rather than min/max diams)
     # D_min = float(config['D_min'])
