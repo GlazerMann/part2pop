@@ -33,3 +33,22 @@ def test_binned_lognormals_rejects_duplicate_species_after_alias_resolution():
 
     with pytest.raises(ValueError, match="duplicate canonical species"):
         build_population(config)
+
+
+@pytest.mark.parametrize("bad_n_bins", ["bogus", None, float("inf"), float("nan")])
+def test_binned_lognormals_reports_invalid_scalar_bin_count(bad_n_bins):
+    config = _config()
+    config["N_bins"] = bad_n_bins
+
+    with pytest.raises(ValueError, match="integer >= 2"):
+        build_population(config)
+
+
+def test_binned_lognormals_accepts_numeric_string_without_mutating_config():
+    config = _config()
+    config["N_bins"] = "3"
+
+    population = build_population(config)
+
+    assert len(population.num_concs) == 3
+    assert config["N_bins"] == "3"
