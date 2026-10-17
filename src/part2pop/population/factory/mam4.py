@@ -16,6 +16,18 @@ from .registry import register
 from ...constants import MOLAR_MASS_DRY_AIR, R, DENSITY_LIQUID_WATER
 from ...utilities import power_moments_from_lognormal
 from .binned_lognormals import build as build_binned_lognormals
+
+
+def _select_active_mode_values(values, indices, n_modes, name, allow_scalar=False):
+    """Select by original mode index; scalar bin counts apply to every mode."""
+    array = np.asarray(values)
+    if allow_scalar and array.ndim == 0:
+        return array.item()
+    if array.ndim != 1 or len(array) != n_modes:
+        raise ValueError(f"{name} must have one entry per original MAM mode ({n_modes}).")
+    return array[indices].tolist()
+
+
 try:
     import netCDF4
     _HAS_NETCDF4 = True
@@ -29,9 +41,10 @@ if _HAS_NETCDF4:
         timestep = config['timestep']
         GSDs = config['GSD']
         if config.get("D_is_wet", True):
-            aero_spec_names = [['SO4','OC','H2O'],['SO4','OC','H2O'],['SO4','OC','H2O'],['SO4','OC','H2O']]
+            mode_species = ['SO4', 'OC', 'H2O']
         else:
-            aero_spec_names = [['SO4','OC'],['SO4','OC'],['SO4','OC'],['SO4','OC']]
+            mode_species = ['SO4', 'OC']
+        aero_spec_names = [mode_species.copy() for _ in GSDs]
         
         N_bins = config['N_bins']
         
@@ -101,13 +114,12 @@ if _HAS_NETCDF4:
             N_bins = config['N_bins']
             species_modifications = config.get('species_modification',{}) # modify species properties during post-processing
             output_filename = mam4_dir / 'mam_output.nc'
-            currnc = netCDF4.Dataset(output_filename)
-
-            num_aer = currnc['num_aer']
-            so4_aer = currnc['so4_aer']
-            soa_aer = currnc['soa_aer']
-            dgn_a = currnc['dgn_a']
-            dgn_awet = currnc['dgn_awet']
+            with netCDF4.Dataset(output_filename) as currnc:
+                num_aer = currnc['num_aer'][:, output_tt_idx]
+                so4_aer = currnc['so4_aer'][:, output_tt_idx]
+                soa_aer = currnc['soa_aer'][:, output_tt_idx]
+                dgn_a = currnc['dgn_a'][:, output_tt_idx]
+                dgn_awet = currnc['dgn_awet'][:, output_tt_idx]
 
             p = config['p']
             T = config['T']
@@ -117,15 +129,21 @@ if _HAS_NETCDF4:
 
             # fixme: make this right
             rho_dry_air = MOLAR_MASS_DRY_AIR * p / (R * T)
-            Ns = num_aer[:,output_tt_idx] * rho_dry_air # N/m^3
+            Ns = num_aer * rho_dry_air # N/m^3
             idx, = np.where(Ns>0)
+            # Every per-mode input refers to the original file mode order.
+            # Apply the same indices before moments or population construction;
+            # truncating a prefix would misidentify modes after an inactive one.
+            GSDs = _select_active_mode_values(GSDs, idx, len(Ns), 'GSD')
+            N_bins = _select_active_mode_values(
+                N_bins, idx, len(Ns), 'N_bins', allow_scalar=True)
             Ns = Ns[idx]
             D_is_wet = config.get("D_is_wet", True)
-            GMDs_wet = dgn_awet[idx,output_tt_idx]
-            GMDs = dgn_a[idx,output_tt_idx]
+            GMDs_wet = dgn_awet[idx]
+            GMDs = dgn_a[idx]
             
-            mass_so4 = so4_aer[idx,output_tt_idx] * rho_dry_air
-            mass_soa = soa_aer[idx,output_tt_idx] * rho_dry_air
+            mass_so4 = so4_aer[idx] * rho_dry_air
+            mass_soa = soa_aer[idx] * rho_dry_air
             # fixme: not actually sure what assumptions go into this for MAM4, assuming same GSD to compute mass H2O
             mass_h2o = DENSITY_LIQUID_WATER * np.pi/6 * np.array(
                     [
@@ -133,7 +151,7 @@ if _HAS_NETCDF4:
                         - power_moments_from_lognormal(3, N, gmd, gsd)) 
                         for (N, gmd, gmd_wet, gsd) in zip(Ns, GMDs, GMDs_wet, GSDs)])
             if D_is_wet:
-                aero_spec_names = [['SO4','OC','H2O'],['SO4','OC','H2O'],['SO4','OC','H2O'],['SO4','OC','H2O']]
+                aero_spec_names = [mode_species.copy() for _ in idx]
                 aero_spec_fracs = []
                 for (m_so4,m_soa,m_h2o) in zip(mass_so4,mass_soa,mass_h2o):
                     spec_frac = np.array([m_so4,m_soa,m_h2o])
@@ -141,7 +159,7 @@ if _HAS_NETCDF4:
                     spec_frac[np.isnan(spec_frac)] = 0.
                     aero_spec_fracs.append(spec_frac)
             else:
-                aero_spec_names = [['SO4','OC'],['SO4','OC'],['SO4','OC'],['SO4','OC']]
+                aero_spec_names = [mode_species.copy() for _ in idx]
                 aero_spec_fracs = []
                 for (m_so4,m_soa) in zip(mass_so4,mass_soa):
                     spec_frac = np.array([m_so4,m_soa])
