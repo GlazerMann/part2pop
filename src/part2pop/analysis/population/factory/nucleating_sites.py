@@ -6,6 +6,12 @@ import numpy as np
 
 @register_variable("nucleating_sites")
 class NucleatingSites(PopulationVariable):
+    """Integrate heterogeneous rates using the supplied particle water content.
+
+    No RH equilibration is performed here. Omitted species_modifications
+    inherit population overrides; an explicit mapping, including {}, replaces
+    them. The cooling-integral definition still requires scientific review.
+    """
     meta = VariableMeta(
         name="nucleating_sites",
         description='Cumulative heterogeneous ice-nucleation active sites per surface area during cooling.',
@@ -24,7 +30,9 @@ class NucleatingSites(PopulationVariable):
         freezing_cfg = {
             "T_grid": list(cfg["T_grid"]),
             "morphology": cfg.get("morphology", "homogeneous"),
-            "species_modifications": cfg.get("species_modifications", {}),
+            "species_modifications": cfg.get(
+                "species_modifications", getattr(population, "species_modifications", {})
+            ) or {},
             "T_units": units
         }
         freezing_pop = build_freezing_population(population, freezing_cfg)
