@@ -144,7 +144,7 @@ def ensure_refractive_index(spec, wvl_grid, modifications=None):
         desired = get_RI_params(spec.name)
         desired.update({k: v for k, v in modifications.items() if k in desired})
         current = getattr(existing, "RI_params", None)
-        if current == desired or (current is None and not modifications):
+        if current == desired:
             return spec
     return build_refractive_index(spec, grid, modifications=modifications)
 
