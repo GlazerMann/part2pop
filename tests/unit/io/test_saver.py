@@ -115,3 +115,24 @@ def test_population_metadata_object_array_is_rejected(tmp_path):
 
     with pytest.raises(TypeError, match="object dtype"):
         saver.save_population(tmp_path / "object_metadata.npz", population)
+
+
+@pytest.mark.parametrize("dtype", [np.longdouble, np.clongdouble])
+def test_population_metadata_extended_scalar_roundtrip(tmp_path, dtype):
+    # Use a value with more precision than a Python float can retain where
+    # the platform provides extended precision. Include an imaginary part too.
+    value = dtype("1.234567890123456789")
+    if np.issubdtype(dtype, np.complexfloating):
+        value += dtype(1j) * dtype("0.1234567890123456789")
+    if not isinstance(value.item(), np.generic):
+        pytest.skip("scalar has a native Python representation on this platform")
+    population = _simple_population()
+    population.metadata = {"nested": {"value": value}}
+    saved = saver.save_population(tmp_path / "extended_scalar.npz", population)
+    with np.load(saved, allow_pickle=False) as archive:
+        assert all(not archive[key].dtype.hasobject for key in archive.files)
+    restored, _, _ = loader.load_population(saved)
+    result = restored.metadata["nested"]["value"]
+    assert isinstance(result, np.generic)
+    assert result.dtype == value.dtype
+    assert result == value

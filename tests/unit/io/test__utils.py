@@ -78,6 +78,13 @@ def test_population_metadata_codec_does_not_confuse_user_mappings_with_tags():
     assert decoded == payload
 
 
+def test_population_metadata_scalar_tag_does_not_capture_user_mapping():
+    payload = {"__part2pop_numpy_scalar__": {"user": "data"}}
+    arrays = {}
+    encoded = _utils._encode_population_metadata(payload, arrays)
+    assert _utils._decode_population_metadata(encoded, arrays) == payload
+
+
 def test_serialize_metadata_emits_numpy_string():
     metadata = {"tag": "roundtrip", "value": 42}
     serialized = _utils.serialize_metadata(metadata)
