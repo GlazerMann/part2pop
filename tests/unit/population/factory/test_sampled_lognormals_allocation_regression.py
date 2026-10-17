@@ -28,3 +28,15 @@ def test_invalid_mode_concentrations_raise():
     for conc in [(0., 0., 0.), (-1., 2., 1.), (float('nan'), 1., 1.)]:
         with pytest.raises(ValueError, match="Mode number concentrations"):
             sampled_lognormals.build(_cfg(6, conc))
+
+
+def test_finite_concentrations_with_overflowing_total_are_rejected():
+    with np.errstate(over="raise", invalid="raise"):
+        with pytest.raises(ValueError, match="finite positive total"):
+            sampled_lognormals.build(_cfg(10, (1e308, 1e308, 1e308)))
+
+
+def test_large_finite_total_keeps_exact_requested_count():
+    pop = sampled_lognormals.build(_cfg(10, (1e307, 1e307, 1e307)))
+    assert len(pop.ids) == 10
+    assert pop.get_Ntot() == pytest.approx(3e307)

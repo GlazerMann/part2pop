@@ -34,8 +34,13 @@ def build(config):
     N_parts_cfg = config.get("N_parts", 100)
     specdata_path = config.get("specdata_path", None)
 
-    if not np.all(np.isfinite(N_list)) or np.any(N_list < 0) or N_list.sum() <= 0:
-        raise ValueError("Mode number concentrations must be finite, nonnegative, and have positive total.")
+    # Finite entries can still overflow their sum. Reject that configuration
+    # rather than silently losing samples when normalized quotas become zero.
+    with np.errstate(over="ignore", invalid="ignore"):
+        total_concentration = float(np.sum(N_list))
+    if (not np.all(np.isfinite(N_list)) or np.any(N_list < 0)
+            or not np.isfinite(total_concentration) or total_concentration <= 0):
+        raise ValueError("Mode number concentrations must be finite, nonnegative, and have finite positive total.")
 
     if isinstance(N_parts_cfg, (list, tuple)):
         N_parts_list = np.asarray(N_parts_cfg, dtype=int)
@@ -52,7 +57,7 @@ def build(config):
         # Reserve one sample per mode, then apportion the remaining samples
         # by largest remainder. This has a strict O(n_modes log n_modes) bound.
         remaining = N_parts_total - n_modes
-        quotas = (N_list / N_list.sum()) * remaining
+        quotas = (N_list / total_concentration) * remaining
         extra = np.floor(quotas).astype(int)
         remainder = remaining - int(extra.sum())
         if remainder:
