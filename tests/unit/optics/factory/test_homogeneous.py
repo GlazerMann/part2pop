@@ -28,9 +28,9 @@ def test_rayleigh_cross_sections_nonabsorbing_particle():
     )
 
     assert csca > 0.0
-    assert cabs == pytest.approx(0.0)
-    assert cext == pytest.approx(csca)
-    assert g == pytest.approx(0.0)
+    assert cabs == pytest.approx(0.0, abs=1e-30)
+    assert cext == pytest.approx(csca, rel=1e-12, abs=0.0)
+    assert g == pytest.approx(0.0, abs=1e-30)
 
 
 def test_rayleigh_cross_sections_absorbing_particle():
@@ -42,8 +42,8 @@ def test_rayleigh_cross_sections_absorbing_particle():
 
     assert csca > 0.0
     assert cabs > 0.0
-    assert cext == pytest.approx(csca + cabs)
-    assert g == pytest.approx(0.0)
+    assert cext == pytest.approx(csca + cabs, rel=1e-12, abs=0.0)
+    assert g == pytest.approx(0.0, abs=1e-30)
 
 
 def test_missing_pymiescatt_requires_explicit_rayleigh_opt_in(monkeypatch):
@@ -89,9 +89,9 @@ def test_explicit_rayleigh_fallback_warns_and_computes(monkeypatch):
     assert hp.Csca[0, 0] >= 0.0
     assert hp.Cabs[0, 0] >= 0.0
     assert hp.Cext[0, 0] == pytest.approx(
-        hp.Csca[0, 0] + hp.Cabs[0, 0]
+        hp.Csca[0, 0] + hp.Cabs[0, 0], rel=1e-12, abs=0.0
     )
-    assert hp.g[0, 0] == pytest.approx(0.0)
+    assert hp.g[0, 0] == pytest.approx(0.0, abs=1e-30)
 
 
 @pytest.mark.skipif(_PMS_ERR is not None, reason=f"PyMieScatt not available: {_PMS_ERR}")

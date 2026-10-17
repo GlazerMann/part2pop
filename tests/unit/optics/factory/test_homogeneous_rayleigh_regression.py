@@ -46,8 +46,8 @@ def test_rayleigh_matches_mie_in_small_particle_limit():
     )
     geometric_area = math.pi * radius_m**2
 
-    assert csca == pytest.approx(mie["Qsca"] * geometric_area, rel=0.02)
-    assert cext == pytest.approx(mie["Qext"] * geometric_area, rel=0.02)
+    assert csca == pytest.approx(mie["Qsca"] * geometric_area, rel=0.02, abs=0.0)
+    assert cext == pytest.approx(mie["Qext"] * geometric_area, rel=0.02, abs=0.0)
     assert cabs == pytest.approx(0.0, abs=1e-30)
     assert g == pytest.approx(0.0)
 
@@ -78,9 +78,9 @@ def test_rayleigh_matches_mie_for_absorbing_particle_in_small_particle_limit():
     )
     geometric_area = math.pi * radius_m**2
 
-    assert csca == pytest.approx(mie["Qsca"] * geometric_area, rel=0.02)
-    assert cabs == pytest.approx(mie["Qabs"] * geometric_area, rel=0.02)
-    assert cext == pytest.approx(mie["Qext"] * geometric_area, rel=0.02)
+    assert csca == pytest.approx(mie["Qsca"] * geometric_area, rel=0.02, abs=0.0)
+    assert cabs == pytest.approx(mie["Qabs"] * geometric_area, rel=0.02, abs=0.0)
+    assert cext == pytest.approx(mie["Qext"] * geometric_area, rel=0.02, abs=0.0)
     assert g == pytest.approx(0.0)
 
 
