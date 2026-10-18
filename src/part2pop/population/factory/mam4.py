@@ -112,7 +112,6 @@ if _HAS_NETCDF4:
             # fixme: make this +/- certain number of sigmas (rather than min/max diams)
             
             N_bins = config['N_bins']
-            species_modifications = config.get('species_modification',{}) # modify species properties during post-processing
             output_filename = mam4_dir / 'mam_output.nc'
             with netCDF4.Dataset(output_filename) as currnc:
                 num_aer = currnc['num_aer'][:, output_tt_idx]
@@ -184,6 +183,9 @@ if _HAS_NETCDF4:
                 "D_min": config.get('D_min', None),
                 "D_max": config.get('D_max', None),
             }
+        # Preserve explicit species properties and the overrides inherited by
+        # downstream optics/freezing, as the other population factories do.
+        lognormals_cfg['species_modifications'] = config.get('species_modifications', {})
         mam4_population = build_binned_lognormals(lognormals_cfg)
         return mam4_population
 
