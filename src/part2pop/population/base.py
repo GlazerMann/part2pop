@@ -84,8 +84,11 @@ class ParticlePopulation:
             particle = self.get_particle(part_id)
             rs.append(particle.get_Dwet()/2.)
         rs = np.asarray(rs)
-        Ns = self.num_concs
-        return np.sum(rs*Ns)/np.sum(Ns)
+        Ns = np.asarray(self.num_concs, dtype=float)
+        area_moment = np.sum(Ns * rs**2)
+        if area_moment == 0:
+            return np.nan
+        return np.sum(Ns * rs**3) / area_moment
 
     def get_Ntot(self):
         return np.sum(self.num_concs)
