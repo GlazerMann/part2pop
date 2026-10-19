@@ -140,7 +140,9 @@ class HomogeneousParticle(FreezingParticle):
         for species in self.base_particle.species:
             try:
                 spec_mod = dict(spec_modifications.get(species.name, {}))
-                _, _ = retrieve_Jhet_val(species.name, spec_modifications=spec_mod, specdata_path=specdata_path)
+                m_Jhet, b_Jhet = retrieve_Jhet_val(species.name, spec_modifications=spec_mod, specdata_path=specdata_path)
+                if np.isnan(float(m_Jhet)) or np.isnan(float(b_Jhet)):
+                    continue
                 vks.append(self.base_particle.get_spec_vol(species.name)[0])
             except:
                 continue
