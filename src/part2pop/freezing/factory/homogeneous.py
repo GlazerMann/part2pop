@@ -137,13 +137,18 @@ class HomogeneousParticle(FreezingParticle):
     
     def get_insoluble_radius(self, spec_modifications={}, specdata_path='species_data'):
         vks = []
-        for species in self.base_particle.species:
+        volumes = self.base_particle.get_vks()
+        for ii, species in enumerate(self.base_particle.species):
             try:
                 spec_mod = dict(spec_modifications.get(species.name, {}))
                 _, _ = retrieve_Jhet_val(species.name, spec_modifications=spec_mod, specdata_path=specdata_path)
-                vks.append(self.base_particle.get_spec_vol(species.name)[0])
-            except:
-                continue
+            except Exception:
+                # Complete custom pairs already participate in compute_Jhet.
+                m_Jhet = spec_mod.get("m_log10_Jhet", np.nan)
+                b_Jhet = spec_mod.get("b_log10_Jhet", np.nan)
+                if np.isnan(m_Jhet) or np.isnan(b_Jhet):
+                    continue
+            vks.append(volumes[ii])
         return ((3.0*np.sum(np.array(vks)))/(4.0*np.pi))**(1/3)
     
         
