@@ -48,29 +48,20 @@ class HomogeneousParticle(FreezingParticle):
         water_mass = self.base_particle.get_spec_mass("H2O")
         if water_mass <= 0:
             return 0.0
-        else:
-            vks = np.zeros((len(self.base_particle.species)))
-            spec_Jhets = np.zeros((len(self.base_particle.species)))
-            P_wv, P_ice = calculate_Psat(T)
-            aw_ice = P_ice/P_wv
-            aw = self.get_aw()
-            delta_aw = aw - aw_ice
-            for ii, (species, m, b) in enumerate(zip(self.base_particle.species, self.m_log10_Jhet, self.b_log10_Jhet)):
-                spec_Jhets[ii] = 10**(m * delta_aw + b)
-                vks[ii] = self.base_particle.get_spec_vol(species.name)[0]
-            vks=np.array(vks)
-            spec_Jhets=np.array(spec_Jhets)
-            mask = ~np.isnan(spec_Jhets)
-            
-            # no insoluble species, so Jhet=0.0
-            if (mask==False).all():
-                return 0.0
-            # at least one insoluble species
-            else:
-                weighted_sum = np.nansum(spec_Jhets * vks, axis=0)
-                weight_sum = np.sum(vks * mask, axis=0)
-                return weighted_sum / weight_sum
-    
+
+        volumes = self.base_particle.get_vks()
+        active = (~np.isnan(self.m_log10_Jhet)
+                  & ~np.isnan(self.b_log10_Jhet) & (volumes > 0))
+        if not np.any(active):
+            # A population species column need not occur in this particle.
+            return 0.0
+
+        P_wv, P_ice = calculate_Psat(T)
+        delta_aw = self.get_aw() - P_ice / P_wv
+        rates = 10.0**(self.m_log10_Jhet[active] * delta_aw
+                       + self.b_log10_Jhet[active])
+        return np.sum(rates * volumes[active]) / np.sum(volumes[active])
+
     def compute_Jhom(self, T):
         """ Homogeneous ice nucleation rate following Koop et al. 2000 """
         
