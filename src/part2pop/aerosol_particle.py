@@ -105,8 +105,9 @@ class Particle:
             spec.name not in core_specs + ['H2O'] for spec in self.species])[0]
     
     def idx_spec(self, spec_name):
-        return np.where([
-            spec.name in spec_name for spec in self.species])
+        if isinstance(spec_name, str):
+            return np.where([spec.name == spec_name for spec in self.species])
+        return np.where([spec.name in spec_name for spec in self.species])
         
     def get_spec_rhos(self):
         spec_rhos = np.hstack([one_spec.density for one_spec in self.species])
