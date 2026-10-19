@@ -2,6 +2,7 @@ from __future__ import annotations
 from ..base import PopulationVariable, VariableMeta
 from .registry import register_variable
 from part2pop.freezing.builder import build_freezing_population
+from part2pop.analysis._freezing import resolve_freezing_config
 import numpy as np
 
 @register_variable("frozen_frac")
@@ -19,7 +20,7 @@ class FrozenFraction(PopulationVariable):
     )
     
     def compute(self, population, as_dict=False):
-        cfg = self.cfg
+        cfg = resolve_freezing_config(population, self.cfg)
         species_modifications = cfg.get("species_modifications", None)
         morphology = cfg.get("morphology", "homogeneous")
         T = cfg.get("T", None)
@@ -34,11 +35,7 @@ class FrozenFraction(PopulationVariable):
         if T_units == "C":
              T += 273.15
 
-        # override the underlying population species_modifications if one is supplied
-        if species_modifications:
-            population.species_modifications = species_modifications
-        else:
-            species_modifications = population.species_modifications
+        # Species overrides apply to this calculation, not population defaults.
 
         # equilibrate population to RH if provided
         if RH:

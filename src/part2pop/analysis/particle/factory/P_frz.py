@@ -2,6 +2,7 @@ from __future__ import annotations
 from ..base import ParticleVariable, VariableMeta
 from .registry import register_particle_variable
 from part2pop.freezing.builder import build_freezing_population
+from part2pop.analysis._freezing import resolve_freezing_config
 import numpy as np
 
 @register_particle_variable("P_frz")
@@ -19,7 +20,7 @@ class FreezingProb(ParticleVariable):
     )
     
     def compute_all(self, population):
-        config = self.cfg        
+        config = resolve_freezing_config(population, self.cfg)
         T = config.get("T", None)
         RH = config.get("RH", 0.85)
         species_modifications = config.get("species_modifications", None)
@@ -33,11 +34,7 @@ class FreezingProb(ParticleVariable):
              T += 273.15
         population._equilibrate_h2o(RH, T)
 
-        # override the underlying population species_modifications if one is supplied
-        if species_modifications:
-            population.species_modifications = species_modifications
-        else:
-            species_modifications = population.species_modifications
+        # Species overrides apply to this calculation, not population defaults.
 
         # make freezing population
         freezing_config={"morphology": morphology,

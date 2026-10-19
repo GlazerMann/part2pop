@@ -3,6 +3,7 @@ import numpy as np
 from ..base import PopulationVariable, VariableMeta
 from .registry import register_variable
 from part2pop.freezing.builder import build_freezing_population
+from part2pop.analysis._freezing import resolve_freezing_config
 
 @register_variable("avg_Jhet")
 class avgJhetVar(PopulationVariable):
@@ -20,7 +21,7 @@ class avgJhetVar(PopulationVariable):
     )
 
     def compute(self, population, as_dict=False):
-        cfg = self.cfg
+        cfg = resolve_freezing_config(population, self.cfg)
         morphology = cfg.get("morphology", "homogeneous")
         species_modifications = cfg.get("species_modifications", None)
         T_grid = cfg.get("T_grid", None)
@@ -40,11 +41,7 @@ class avgJhetVar(PopulationVariable):
             T_grid = T_grid+273.15
         population._equilibrate_h2o(RH, T_grid[0])
 
-        # override the underlying population species_modifications if one is supplied
-        if species_modifications:
-            population.species_modifications = species_modifications
-        else:
-            species_modifications = population.species_modifications
+        # Species overrides apply to this calculation, not population defaults.
 
         # make freezing population
         freezing_config={"morphology": morphology,
