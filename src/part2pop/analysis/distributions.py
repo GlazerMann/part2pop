@@ -315,12 +315,49 @@ def density1d_cdf_map(
     return x_tgt_centers, dens_tgt, edges_tgt
 
 
+def _kde_integration_widths(query):
+    """Validate the quadrature grid used by normalization and point masses."""
+    with np.errstate(over="ignore", invalid="ignore"):
+        widths = np.diff(query)
+    if (query.size < 2 or not np.all(np.isfinite(widths))
+            or np.any(widths <= 0)):
+        raise ValueError("KDE integration needs at least two increasing nodes with finite widths")
+    return widths
+
+
+def _point_mass_density(location, total, query, bounds=None):
+    """Deposit count on adjacent nodes, conserving trapezoidal integral in u."""
+    widths = _kde_integration_widths(query)
+    density = np.zeros_like(query, dtype=float)
+    if bounds is None:
+        bounds = query[[0, -1]]
+    elif (bounds.shape != (2,) or not np.all(np.isfinite(bounds))
+            or bounds[0] > query[0] or bounds[1] < query[-1]):
+        raise ValueError("Point-mass bounds must be finite and enclose the query grid")
+    if location < bounds[0] or location > bounds[-1]:
+        return density
+    # A point within an outer half-bin is represented at its nearest endpoint.
+    location = np.clip(location, query[0], query[-1])
+    quadrature_weights = np.empty_like(query, dtype=float)
+    quadrature_weights[0] = widths[0] / 2
+    quadrature_weights[-1] = widths[-1] / 2
+    quadrature_weights[1:-1] = widths[:-1] / 2 + widths[1:] / 2
+    # The domain check guarantees a right-hand index of at least one.
+    right = min(np.searchsorted(query, location, side="right"), query.size - 1)
+    left = right - 1
+    fraction = (location - query[left]) / widths[left]
+    density[left] = total * (1 - fraction) / quadrature_weights[left]
+    density[right] = total * fraction / quadrature_weights[right]
+    return density
+
+
 def kde1d_in_measure(
     x: np.ndarray,
     weights: np.ndarray,
     xq: np.ndarray,
     measure: str = "ln",
     normalize: bool = False,
+    point_mass_bounds=None,
 ):
     """
     Smooth estimate of **number density** wrt the chosen measure using a KDE in u-space.
@@ -340,6 +377,10 @@ def kde1d_in_measure(
     normalize : bool
         If True, rescale dens so that the integral in u-space
         approximated by trapz(dens, u) is 1.
+    point_mass_bounds : pair of floats, optional
+        Outer bin edges enclosing xq, used only for a single-valued population.
+        Points within these bounds but beyond the query nodes are deposited at
+        the nearest endpoint. Without bounds, support is the query interval.
 
     Returns
     -------
@@ -351,27 +392,43 @@ def kde1d_in_measure(
     except Exception as e:
         raise RuntimeError("scipy is required for KDE") from e
 
-    x = np.asarray(x)
+    x = np.asarray(x, dtype=float)
     w = np.asarray(weights, dtype=float)
-    xq = np.asarray(xq)
-
-    # Work in u-space
-    u = _u_from_x(x, measure)
+    xq = np.asarray(xq, dtype=float)
+    if x.ndim != 1 or w.shape != x.shape or xq.ndim != 1:
+        raise ValueError("KDE samples/weights must match 1D arrays; query must be 1D")
+    if not np.all(np.isfinite(x)) or not np.all(np.isfinite(xq)):
+        raise ValueError("KDE sample and query coordinates must be finite")
+    if not np.all(np.isfinite(w)) or np.any(w < 0):
+        raise ValueError("KDE weights must be finite and nonnegative")
     u_q = _u_from_x(xq, measure)
+    if normalize:
+        _kde_integration_widths(u_q)
+    positive = w > 0
+    if not np.any(positive):
+        return np.zeros_like(xq)
+    u = _u_from_x(x[positive], measure)
+    w = w[positive]
+    total_weight = np.sum(w)
+    if not np.isfinite(total_weight):
+        raise ValueError("Total KDE weight must be finite")
 
-    # kde doesn't work on monodisperse populations
-    if len(u)==1 and len(w)==1:
-        dens = np.zeros(u_q.shape)
-        idx = np.argmin(np.abs(u_q - u[0]))
-        dens[idx]=w[0]
+    if np.all(u == u[0]):
+        bounds = None if point_mass_bounds is None else _u_from_x(
+            point_mass_bounds, measure
+        )
+        dens = _point_mass_density(u[0], 1.0 if normalize else total_weight, u_q, bounds)
     else:
+        # scipy normalizes weights: restore counts only for number density.
         kde = gaussian_kde(u, weights=w)
-        dens = kde(u_q)  # dens(u) per du
+        dens = kde(u_q)
+        if not normalize:
+            dens = dens * total_weight
 
     if normalize:
-       total = _trapezoid_integrate(dens, u_q)
-       if total > 0:
-           dens = dens / total
+        total = _trapezoid_integrate(dens, u_q)
+        if total > 0:
+            dens = dens / total
 
     return dens
 
