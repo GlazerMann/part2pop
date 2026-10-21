@@ -32,6 +32,16 @@ class UnfrozenFraction(PopulationVariable):
         T = float(T) + (273.15 if T_units == "C" else 0.0)
         if T <= 0 or not np.isfinite(T):
             raise ValueError("T must be finite and above 0 K.")
+        if RH is not None:
+            RH = float(RH)
+            # Validate before equilibration mutates water masses. Values above
+            # 0.99 used to be clipped silently, so a percent input of 85 ran
+            # at RH = 0.99.
+            if not np.isfinite(RH) or RH < 0 or RH > 1:
+                raise ValueError(
+                    f"RH must be a fraction between 0 and 1, got {RH!r}; "
+                    "give 85% as 0.85."
+                )
 
         # override the underlying population species_modifications if one is supplied
         if species_modifications:
