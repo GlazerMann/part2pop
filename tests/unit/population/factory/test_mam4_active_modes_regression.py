@@ -70,6 +70,10 @@ def test_all_inactive_modes_return_empty_population(tmp_path):
     pop = mam4.build(cfg)
     assert len(pop.ids) == 0
     assert pop.get_Ntot() == 0.0
+    assert pop.spec_masses.shape == (0, len(pop.species))
+    assert pop.num_concs.shape == (0,)
+    assert pop.get_tot_mass() == 0.0
+    assert pop.get_tot_dry_mass() == 0.0
 
 
 @pytest.mark.parametrize("field,value", [("GSD", [1.2, 1.4, 1.6]),
@@ -136,3 +140,7 @@ def test_initial_all_inactive_modes_return_empty_population(tmp_path):
     pop = mam4.build(_namelist(tmp_path, [0.0] * 4))
     assert len(pop.ids) == 0
     assert pop.get_Ntot() == 0.0
+    assert pop.spec_masses.shape == (0, len(pop.species))
+    assert pop.num_concs.shape == (0,)
+    assert pop.get_tot_mass() == 0.0
+    assert pop.get_tot_dry_mass() == 0.0
