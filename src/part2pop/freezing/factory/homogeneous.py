@@ -136,18 +136,29 @@ class HomogeneousParticle(FreezingParticle):
         return aw
     
     def get_insoluble_radius(self, spec_modifications={}, specdata_path='species_data'):
+        """Radius (m) of one sphere holding the particle's ice-active volume.
+
+        A species is ice-active when it has a finite coefficient pair: from the
+        freezing table (with any overrides applied), or a complete custom pair
+        for a species the table does not list. NaN coefficients disable a
+        material, which then contributes neither rate nor area. Volumes are
+        taken by position, so similar names (Na and NaCl) cannot pick up each
+        other's volume. The pooled volume forms a single equivalent sphere, so
+        area scales as V**(2/3) and is not additive across materials.
+        """
         vks = []
         volumes = self.base_particle.get_vks()
         for ii, species in enumerate(self.base_particle.species):
+            spec_mod = dict(spec_modifications.get(species.name, {}))
             try:
-                spec_mod = dict(spec_modifications.get(species.name, {}))
-                _, _ = retrieve_Jhet_val(species.name, spec_modifications=spec_mod, specdata_path=specdata_path)
+                m_Jhet, b_Jhet = retrieve_Jhet_val(species.name, spec_modifications=spec_mod, specdata_path=specdata_path)
             except Exception:
-                # Complete custom pairs already participate in compute_Jhet.
+                # Not in the freezing table: only a complete custom pair is active.
                 m_Jhet = spec_mod.get("m_log10_Jhet", np.nan)
                 b_Jhet = spec_mod.get("b_log10_Jhet", np.nan)
-                if np.isnan(m_Jhet) or np.isnan(b_Jhet):
-                    continue
+            # Table values are strings; overrides may be any number type.
+            if np.isnan(float(m_Jhet)) or np.isnan(float(b_Jhet)):
+                continue
             vks.append(volumes[ii])
         return ((3.0*np.sum(np.array(vks)))/(4.0*np.pi))**(1/3)
     
