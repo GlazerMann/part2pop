@@ -156,10 +156,10 @@ class HomogeneousParticle(FreezingParticle):
                 # Not in the freezing table: only a complete custom pair is active.
                 m_Jhet = spec_mod.get("m_log10_Jhet", np.nan)
                 b_Jhet = spec_mod.get("b_log10_Jhet", np.nan)
-            # Table values are strings; overrides may be any number type.
-            if np.isnan(float(m_Jhet)) or np.isnan(float(b_Jhet)):
+            if not (np.isfinite(float(m_Jhet)) and np.isfinite(float(b_Jhet))):
                 continue
-            vks.append(volumes[ii])
+            if np.isfinite(volumes[ii]) and volumes[ii] > 0:
+                vks.append(volumes[ii])
         return ((3.0*np.sum(np.array(vks)))/(4.0*np.pi))**(1/3)
     
         
