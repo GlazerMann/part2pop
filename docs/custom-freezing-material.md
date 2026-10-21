@@ -1,20 +1,35 @@
-# Custom heterogeneous active material
+# Active material, lookup failures and retained solubility policy
 
-A complete custom `m_log10_Jhet`/`b_log10_Jhet` pair contributes material volume
-to the same equivalent-sphere ice-active area as tabulated material. Zero-valued
-coefficients are valid. Missing or partial custom pairs retain their existing
-warning/fallback behavior. This changes active geometry, not water activity or
-the morphology's area convention.
-Volumes are taken from the species-aligned mass and density arrays, so material
-names such as `Na` and `NaCl` remain distinct.
+Positive finite material volume contributes to one pooled equivalent sphere
+only with a complete finite heterogeneous coefficient pair. Zero/zero is valid;
+NaN or infinity in either coefficient disables activity. Volume is selected by
+species position. The rate mask is supplied separately by PR #123.
 
-A tabulated material whose effective coefficients include NaN is disabled and
-adds no area, as its rate is already excluded. #136 uses the same active-area
-code and also keeps disabled materials out of the water-activity solutes.
-Without #135, the table lookup matches name prefixes, so a custom species named
-`O` or `B` picks up the OC or biological coefficients; merge #135 first.
+PR #135 supplies exact freezing-table name lookup and should merge first.
+Missing names can use complete custom pairs; active-area lookup catches
+ValueError (or the older UnboundLocalError for an unknown name), not arbitrary
+I/O errors. An unreadable table therefore raises rather than silently removing
+active material. The legacy reader also uses ValueError for malformed rows;
+distinguishing malformed data from missing species needs a future reader API.
 
-`INSA_distribution` forwards the authoritative species-modification mapping to
-freezing construction. An absent or `None` mapping inherits population defaults;
-an explicit mapping replaces them, and an explicit empty mapping disables them.
-The calculation does not mutate the population or either mapping.
+The shared active-area source in PRs #127 and #136 must be reconciled against
+their current branch heads before merging the second PR. These follow-up
+patches align their shared source, and compatibility validation covers both
+orders; an earlier claim about unmodified heads merging cleanly was incorrect.
+
+## Scientific decision still required: solubility versus activity
+
+The water-activity calculation remains unchanged. It treats a nonwater species
+as a solute only when BOTH effective heterogeneous coefficients are NaN.
+Disabling just one coefficient removes activity without classifying it as a
+solute. Disabling both also adds its molality to the osmotic sum, potentially
+changing homogeneous freezing substantially. Neither PR keeps every disabled
+material out of the solute calculation. Infinity and a partial NaN pair are
+also distinct from a NaN/NaN pair under this legacy classification.
+
+This documents existing behavior, not physical validation. Independent
+solubility/activity metadata requires a separate reviewed scientific change.
+
+PR #127 additionally forwards INSA_distribution species overrides: omitted or
+None inherits population defaults; an explicit mapping replaces them, and {}
+clears inheritance. The analysis does not persist the mapping on the population.

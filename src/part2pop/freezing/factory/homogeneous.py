@@ -114,6 +114,12 @@ class HomogeneousParticle(FreezingParticle):
             ln(aw) = -Mw * sum_i b_i
         where b_i are ion molalities (mol/kg water).
 
+        Legacy classification: a nonwater material is a solute only when
+        BOTH effective heterogeneous coefficients are NaN. Disabling one
+        coefficient removes activity but not this solute exclusion; disabling
+        both can lower water activity and change homogeneous freezing. Active
+        area fixes do not decouple solubility from freezing coefficients.
+
         Returns
         -------
         aw : float
@@ -136,24 +142,24 @@ class HomogeneousParticle(FreezingParticle):
         return aw
     
     def get_insoluble_radius(self, spec_modifications={}, specdata_path='species_data'):
-        """Radius (m) of one sphere holding the particle's ice-active volume.
+        """Radius (m) of the equivalent sphere of active-material volume.
 
-        A species is ice-active when it has a finite coefficient pair: from the
-        freezing table (with any overrides applied), or a complete custom pair
-        for a species the table does not list. NaN coefficients disable a
-        material, which then contributes neither rate nor area. Volumes are
-        taken by position, so similar names (Na and NaCl) cannot pick up each
-        other's volume. The pooled volume forms a single equivalent sphere, so
-        area scales as V**(2/3) and is not additive across materials.
+        Table species or custom species with complete, finite heterogeneous
+        coefficients contribute their aligned volumes. Nonfinite coefficients
+        disable a material, but a zero/zero coefficient pair remains valid.
         """
         vks = []
         volumes = self.base_particle.get_vks()
         for ii, species in enumerate(self.base_particle.species):
             spec_mod = dict(spec_modifications.get(species.name, {}))
             try:
-                m_Jhet, b_Jhet = retrieve_Jhet_val(species.name, spec_modifications=spec_mod, specdata_path=specdata_path)
-            except Exception:
-                # Not in the freezing table: only a complete custom pair is active.
+                m_Jhet, b_Jhet = retrieve_Jhet_val(
+                    species.name, spec_modifications=spec_mod,
+                    specdata_path=specdata_path
+                )
+            except (ValueError, UnboundLocalError):
+                # Before PR #135, missing names can raise UnboundLocalError;
+                # the corrected exact-name reader raises ValueError.
                 m_Jhet = spec_mod.get("m_log10_Jhet", np.nan)
                 b_Jhet = spec_mod.get("b_log10_Jhet", np.nan)
             if not (np.isfinite(float(m_Jhet)) and np.isfinite(float(b_Jhet))):
