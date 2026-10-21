@@ -136,7 +136,10 @@ class ParticlePopulation:
         Deep-copy species, identifiers, classes and species modifications, and copy
         numeric arrays. Dynamic attributes, arbitrary metadata and subclass fields
         are not copied; the returned object is a ParticlePopulation, not necessarily
-        the same subclass as the source.
+        the same subclass as the source. Built-in power-law refractive-index
+        callables carry detached parameter state. User-supplied callbacks must
+        manage their own captured mutable state: deepcopy does not copy Python
+        function closures.
         """
         return ParticlePopulation(
             species=deepcopy(self.species),
