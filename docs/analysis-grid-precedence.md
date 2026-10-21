@@ -29,5 +29,5 @@ three centers. To request generated bins explicitly, use
 leaving conflicting values, set its canonical and alias keys to the same grid.
 
 Whether each call should instead override earlier calls across aliases and grid
-representations is a separate API policy decision. This patch preserves the
-existing behavior; a future last-call-wins policy needs explicit ordering tests.
+representations is a separate API policy decision. The current behavior is kept
+deliberately; a last-call-wins policy would need explicit ordering tests.
