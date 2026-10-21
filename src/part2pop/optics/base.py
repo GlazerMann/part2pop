@@ -39,9 +39,10 @@ class OpticalParticle(Particle):
         # FIXME: include this in config or make species_modification an optional input?
         # store species_modifications for possible per-morphology overrides
         self.species_modifications = config.get("species_modifications", {}) or {}
-        # An explicit empty mapping resets defaults; omission may reuse the RI
-        # already attached by the population builder on this same grid.
-        self._species_modifications_supplied = "species_modifications" in config
+        # An explicit mapping (including {}) is authoritative; omission or None
+        # may reuse the RI already attached by the population builder on this
+        # same grid.
+        self._species_modifications_supplied = config.get("species_modifications") is not None
 
         # Allocate per-particle cross-section cubes (m²), shape (N_rh, N_wvl)
         N_rh = len(self.rh_grid)

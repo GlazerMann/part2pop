@@ -133,7 +133,9 @@ def ensure_refractive_index(spec, wvl_grid, modifications=None):
     """
     modifications = modifications or {}
     existing = getattr(spec, "refractive_index", None)
-    grid = np.asarray(wvl_grid, dtype=float)
+    # Copy: the stored grid must not alias the caller's array, or editing that
+    # array in place would make a stale RI look current.
+    grid = np.array(wvl_grid, dtype=float)
     if (existing is not None
             and callable(getattr(existing, "real_ri_fun", None))
             and callable(getattr(existing, "imag_ri_fun", None))
