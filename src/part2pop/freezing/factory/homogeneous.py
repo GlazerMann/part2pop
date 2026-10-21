@@ -64,8 +64,9 @@ class HomogeneousParticle(FreezingParticle):
             return 0.0
 
         volumes = self.base_particle.get_vks()
-        active = (~np.isnan(self.m_log10_Jhet)
-                  & ~np.isnan(self.b_log10_Jhet) & (volumes > 0))
+        active = (np.isfinite(self.m_log10_Jhet)
+                  & np.isfinite(self.b_log10_Jhet)
+                  & np.isfinite(volumes) & (volumes > 0))
         if not np.any(active):
             # A population species column need not occur in this particle.
             return 0.0
