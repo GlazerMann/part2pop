@@ -64,3 +64,13 @@ masses start with unit weight. They are then normalized on the query grid as
 before. Multiplying by total concentration and subsequently dividing it out
 can underflow or overflow unnecessarily; raw number-density output still uses
 the total concentration.
+
+## Numerically dominant sample weights
+
+Even distinct samples can have numerically singular weighted covariance when
+one normalized weight is essentially one. If `1 - sum(p**2)` is no larger
+than eight float64 epsilons, samples take the same conservative point-mass
+path. Weights are rescaled before this check to avoid overflow/underflow in
+the covariance decision. This is a numerical fallback, not removal of small
+positive concentrations; deposition still uses their original weights (or
+unit-total weights for normalized output). Other fitting ValueErrors propagate.

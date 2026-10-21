@@ -475,10 +475,17 @@ def kde1d_in_measure(
     order = np.argsort(u_q, kind="stable")
     u_sorted = u_q[order]
 
+    # Weighted covariance divides by 1 - sum(p**2). A dominant weight can
+    # round this denominator to zero even with distinct samples. SciPy then
+    # raises ValueError for a nonfinite covariance, not LinAlgError. Detect
+    # that numerical degeneracy without swallowing unrelated ValueErrors.
+    scaled_weights = w / np.max(w)
+    probabilities = scaled_weights / np.sum(scaled_weights)
+    covariance_dof = 1.0 - np.sum(probabilities**2)
     kde = None
-    if not np.all(u == u[0]):
+    if not np.all(u == u[0]) and covariance_dof > 8 * np.finfo(float).eps:
         try:
-            kde = gaussian_kde(u, weights=w)
+            kde = gaussian_kde(u, weights=probabilities)
         except np.linalg.LinAlgError:
             kde = None  # numerically singular spread: treat as point masses
     if kde is None or _kernel_is_unresolved(float(np.sqrt(kde.covariance[0, 0])), u_sorted):
