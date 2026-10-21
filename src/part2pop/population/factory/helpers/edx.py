@@ -5,9 +5,35 @@ module reconstructs approximate aerosol-species mass fractions using a named
 set of stoichiometric and grouping assumptions required by downstream part2pop
 calculations. The reconstruction is not unique and should not be interpreted as
 a direct measurement of aerosol material species.
+
+Assumptions of the ``sulfate_oxide_organic_allocation`` scheme:
+
+* Input. Each row gives element mass fractions for the configured elements.
+  All 16 default elements (C, N, O, Na, Mg, Al, Si, P, S, Cl, K, Ca, Mn, Fe,
+  Zn, Cu) must be present, and all six target species (SO4, OIN, OC, Na, Cl,
+  biological) must be requested. Rows are treated as percent when the mean
+  row sum is within ``np.isclose`` of 100 (about +/-0.001); the reconstructed
+  species fractions must then sum to 0.99-1.01 or a ValueError is raised.
+  Unlisted elements (for example Ti or Br) are not read and are not
+  renormalized away.
+* Hydrogen is not measured by EDX, so organic and ammonium mass is
+  under-counted relative to the true particle mass.
+* Default branch: all S is sulfate (S + 4 O, capped by measured O). Mg, Al,
+  Si, K, Ca, Fe, Mn and Cu take fixed oxide oxygen (MgO, Al2O3, SiO2, K2O,
+  CaO, Fe2O3, MnO, CuO), capped by the O left after sulfate; Zn joins OIN
+  without oxide oxygen. Remaining C, N, P and O become OC, so carbonate
+  carbon, ammonium and nitrate nitrogen, and phosphate phosphorus are all
+  reconstructed as organic carbon.
+* Biological branch: only Al and Si form an oxide coating; S, K, Mg, Ca, Fe,
+  Mn, Zn and Cu join the biological species and no sulfate is formed.
+* Carbonaceous branch (the listed carbonaceous classes, or labels containing
+  the whole word "organics"): same oxides as the default branch, no sulfate;
+  S joins OC.
+* Na and Cl are assigned directly to the Na and Cl species in every branch.
 """
 
 from dataclasses import dataclass
+import re
 from typing import Any, Dict
 import warnings
 
@@ -19,6 +45,7 @@ _MASS_SUM_MIN = 0.99
 _MASS_SUM_MAX = 1.01
 _PERCENT_SUM_TARGET = 100.0
 _CARBONACEOUS_CLASSES = ("carbonaceous", "carbonaceous mixed dust", "dust-carbonaceous")
+_CLASS_LABEL_SEPARATORS = re.compile(r"[\s_\-/,;]+")
 # Existing behavior groups all of these elemental masses into reconstructed OIN.
 # Stoichiometric oxygen is allocated for Mg/Al/Si/K/Ca/Fe/Mn/Cu, while Zn is
 # included in OIN without an additional oxygen allocation.
@@ -357,6 +384,20 @@ def sample_carbonaceous_particle(aerospecs: list[str], mass_fraction: np.ndarray
     return sampled_masses
 
 
+def _is_carbonaceous_class(ptype: str) -> bool:
+    """Return True for particle classes routed to the carbonaceous branch.
+
+    Matches the listed carbonaceous classes exactly, or any label containing
+    the whole word "organics" (for example "organics" or "mixed organics").
+    Whole-word matching keeps labels such as "inorganics" on the default
+    branch; a substring test sent them to the carbonaceous branch, which
+    assigns sulfur to OC instead of SO4.
+    """
+    if ptype in _CARBONACEOUS_CLASSES:
+        return True
+    return "organics" in _CLASS_LABEL_SEPARATORS.split(ptype.strip())
+
+
 def reconstruct_edx_species_mass_fractions(
     raw_population: EdxElementMassFractions,
     aero_spec_names: list[str],
@@ -369,7 +410,7 @@ def reconstruct_edx_species_mass_fractions(
 
         if ptype == 'biological':
             aero_spec_masses[ii] = sample_bio_particle(aero_spec_names, mass_fracs, raw_population.elements)
-        elif ptype in _CARBONACEOUS_CLASSES or "organics" in ptype:
+        elif _is_carbonaceous_class(ptype):
             aero_spec_masses[ii] = sample_carbonaceous_particle(aero_spec_names, mass_fracs, raw_population.elements)
         else:
             aero_spec_masses[ii] = sample_particle(aero_spec_names, mass_fracs, raw_population.elements)

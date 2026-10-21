@@ -140,3 +140,39 @@ def test_sample_bio_particle_oxygen_limited_and_normalize_guard():
 
     with pytest.raises(ValueError, match="sum to"):
         _normalize_or_raise(np.array([0.2, 0.2]))
+
+
+@pytest.mark.parametrize(
+    ("ptype", "carbonaceous"),
+    [
+        ("inorganics", False),
+        ("inorganic", False),
+        ("sulfate", False),
+        ("organics", True),
+        ("mixed organics", True),
+        ("carbonaceous", True),
+    ],
+)
+def test_reconstruction_routes_class_labels_by_whole_word(ptype, carbonaceous):
+    # A substring test sent "inorganics" to the carbonaceous branch, which puts
+    # all sulfur into OC: SO4 0.749 / OC 0.201 became SO4 0 / OC 0.950.
+    elements = np.array(['C', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl',
+                         'K', 'Ca', 'Mn', 'Fe', 'Zn', 'Cu'])
+    row = np.zeros(len(elements))
+    for element, fraction in {"C": 0.05, "N": 0.15, "O": 0.50, "Na": 0.05, "S": 0.25}.items():
+        row[list(elements).index(element)] = fraction
+    raw = EdxElementMassFractions(
+        np.array([1e-6]), elements, row[None, :].copy(), np.array([ptype])
+    )
+    species = list(_DEFAULT_EDX_TARGET_SPECIES)
+
+    masses, _ = reconstruct_edx_species_mass_fractions(raw, species)
+    so4 = masses[0, species.index("SO4")]
+    oc = masses[0, species.index("OC")]
+
+    if carbonaceous:
+        assert so4 == 0.0
+        assert oc == pytest.approx(0.95)
+    else:
+        assert so4 == pytest.approx(0.749, abs=5e-4)
+        assert oc == pytest.approx(0.201, abs=5e-4)
