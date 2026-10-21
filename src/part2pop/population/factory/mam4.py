@@ -90,9 +90,24 @@ if _HAS_NETCDF4:
                     spec_frac.append(frac)
                     total_frac += frac
                 spec_frac = np.array(spec_frac)
-                spec_frac /= total_frac
+                if total_frac > 0:
+                    spec_frac /= total_frac
                 aero_spec_fracs.append(spec_frac)
             aero_spec_fracs = np.array(aero_spec_fracs)
+
+            # Drop inactive modes exactly as the output path does, selecting
+            # every per-mode input by the same original mode indices. An
+            # inactive mode would otherwise reach binned_lognormals as
+            # zero-concentration particles (and a 0/0 composition when the
+            # namelist gives it no mass fractions).
+            idx, = np.where(Ns > 0)
+            GSDs = _select_active_mode_values(GSDs, idx, len(Ns), 'GSD')
+            N_bins = _select_active_mode_values(
+                N_bins, idx, len(Ns), 'N_bins', allow_scalar=True)
+            GMDs = _select_active_mode_values(GMDs, idx, len(Ns), 'GMD_init')
+            Ns = Ns[idx]
+            aero_spec_names = [aero_spec_names[kk] for kk in idx]
+            aero_spec_fracs = [aero_spec_fracs[kk] for kk in idx]
 
             lognormals_cfg = {
                 'type': 'binned_lognormals',

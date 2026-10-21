@@ -79,3 +79,60 @@ def test_mode_parameters_must_describe_original_modes(tmp_path, field, value):
     cfg[field] = value
     with pytest.raises(ValueError, match=field + " must have one entry per original MAM mode"):
         mam4.build(cfg)
+
+
+# --- Initial conditions (timestep=1, read from the namelist) ---------------
+
+def _namelist(tmp_path, numbers, omit_fractions_for=()):
+    lines = []
+    for mode, number in enumerate(numbers, start=1):
+        lines.append(f"numc{mode} = {number},")
+        if mode not in omit_fractions_for:
+            lines += [f"mfso4{mode} = 0.25,", f"mfpom{mode} = 0.75,"]
+    (tmp_path / "namelist").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return {"mam4_dir": str(tmp_path), "timestep": 1, "D_is_wet": False,
+            "GSD": [1.2, 1.4, 1.6, 1.8], "N_bins": [2, 3, 4, 5],
+            "GMD_init": [1e-7, 2e-7, 3e-7, 4e-7], "p": 90000.0, "T": 298.0}
+
+
+@pytest.mark.parametrize("bins", [[2, 3, 4, 5], 3])
+def test_initial_inactive_mode_is_dropped_with_aligned_indices(tmp_path, monkeypatch, bins):
+    cfg = _namelist(tmp_path, [1e6, 0.0, 3e6, 4e6])
+    cfg["N_bins"] = bins
+    captured = {}
+
+    def capture(config):
+        captured.update(config)
+        return "built"
+
+    monkeypatch.setattr(mam4, "build_binned_lognormals", capture)
+    assert mam4.build(cfg) == "built"
+    np.testing.assert_array_equal(captured["N"], [1e6, 3e6, 4e6])
+    assert captured["GSD"] == [1.2, 1.6, 1.8]
+    assert captured["GMD"] == [1e-7, 3e-7, 4e-7]
+    assert captured["N_bins"] == ([2, 4, 5] if isinstance(bins, list) else 3)
+    assert captured["aero_spec_names"] == [["SO4", "OC"]] * 3
+    for row in captured["aero_spec_fracs"]:
+        np.testing.assert_allclose(row, [0.25, 0.75], rtol=1e-12, atol=0.0)
+
+
+def test_initial_real_builder_skips_inactive_mode(tmp_path):
+    pop = mam4.build(_namelist(tmp_path, [1e6, 0.0, 3e6, 4e6]))
+    assert len(pop.ids) == 2 + 4 + 5
+    assert pop.get_Ntot() == pytest.approx(8e6)
+    assert np.all(pop.num_concs > 0)
+
+
+def test_initial_inactive_mode_without_fractions_builds(tmp_path):
+    # An unused mode often has no mass fractions in the namelist at all; it
+    # used to produce a 0/0 composition before reaching the lognormal builder.
+    cfg = _namelist(tmp_path, [1e6, 0.0, 3e6, 4e6], omit_fractions_for=(2,))
+    with np.errstate(invalid="raise", divide="raise"):
+        pop = mam4.build(cfg)
+    assert pop.get_Ntot() == pytest.approx(8e6)
+
+
+def test_initial_all_inactive_modes_return_empty_population(tmp_path):
+    pop = mam4.build(_namelist(tmp_path, [0.0] * 4))
+    assert len(pop.ids) == 0
+    assert pop.get_Ntot() == 0.0
