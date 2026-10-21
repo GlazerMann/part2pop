@@ -54,9 +54,19 @@ jobs:
           fi
 
           git commit -m "docs: update draft JOSS paper PDF"
-          # A human or another workflow may have advanced main while the PDF
-          # was building. Rebase rather than force-pushing or failing with a
-          # stale checkout.
+          # Main may have advanced while the PDF was building.
           git fetch --no-tags origin main
-          git rebase origin/main
+
+          # If the paper sources changed, this PDF is already stale. Skip it:
+          # the push that changed them triggers a fresh build of its own.
+          if ! git diff --quiet "$GITHUB_SHA" origin/main -- paper ':(exclude)paper/paper.pdf'; then
+            echo "Paper sources changed on main during the build; not committing a stale PDF."
+            exit 0
+          fi
+
+          # Only other files moved. Rebase rather than force-pushing. If main
+          # also changed paper.pdf, keep this build's PDF: it was built from
+          # the same paper sources (in a rebase, -X theirs favours the commit
+          # being replayed).
+          git rebase -X theirs origin/main
           git push origin HEAD:main
