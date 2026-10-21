@@ -6,7 +6,13 @@ coefficients are valid. Missing or partial custom pairs retain their existing
 warning/fallback behavior. This changes active geometry, not water activity or
 the morphology's area convention.
 Volumes are taken from the species-aligned mass and density arrays, so material
-names such as `Na` and `NaCl` remain distinct even if this patch is applied alone.
+names such as `Na` and `NaCl` remain distinct.
+
+A tabulated material whose effective coefficients include NaN is disabled and
+adds no area, as its rate is already excluded. #136 uses the same active-area
+code and also keeps disabled materials out of the water-activity solutes.
+Without #135, the table lookup matches name prefixes, so a custom species named
+`O` or `B` picks up the OC or biological coefficients; merge #135 first.
 
 `INSA_distribution` forwards the authoritative species-modification mapping to
 freezing construction. An absent or `None` mapping inherits population defaults;
