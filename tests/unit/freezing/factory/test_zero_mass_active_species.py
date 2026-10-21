@@ -98,3 +98,19 @@ def test_absent_material_is_not_evaluated_even_if_its_rate_would_overflow():
     )
     with np.errstate(over="raise", invalid="raise", divide="raise"):
         assert f.compute_Jhet(250.0) == pytest.approx(100.0)
+
+
+@pytest.mark.parametrize("names", [["ARO1", "SO4", "H2O"], ["BC", "SO4", "H2O"]])
+@pytest.mark.parametrize("temperature", [273.15, 283.15, 298.15])
+def test_no_heterogeneous_rate_without_ice_supersaturation(names, temperature):
+    # At and above 0 degC a_w <= a_w,ice, so ice cannot nucleate. The packaged
+    # SOA rows have m_log10_Jhet = 0, which used to give a constant 10**8.98
+    # m^-2 s^-1 at any temperature.
+    pop, cfg = freezing(names, [0.05, 0.05, 0.9])
+    assert pop.compute_Jhets(temperature, cfg)[0] == 0.0
+
+
+def test_supercooled_rates_are_unchanged():
+    pop, cfg = freezing(["ARO1", "SO4", "H2O"], [0.05, 0.05, 0.9])
+    # m = 0 material keeps its constant tabulated rate once supercooled.
+    assert pop.compute_Jhets(250.0, cfg)[0] == pytest.approx(10**8.98, rel=1e-12)

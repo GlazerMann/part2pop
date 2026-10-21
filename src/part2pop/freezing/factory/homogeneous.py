@@ -45,6 +45,20 @@ class HomogeneousParticle(FreezingParticle):
         
                 
     def compute_Jhet(self, T):
+        """Heterogeneous ice nucleation rate (m^-2 s^-1) at temperature T (K).
+
+        Each ice-active material (finite ``m_log10_Jhet`` and ``b_log10_Jhet``
+        and positive volume) contributes ``J_k = 10**(m_k*daw + b_k)``, the
+        water-activity-based form of Knopf and Alpert (2013, Faraday Discuss.
+        165), with ``daw = a_w - a_w,ice(T)``. The particle rate is the
+        volume-weighted mean of the ``J_k``. The area it multiplies (``INSA``)
+        is one equivalent sphere of the pooled active volume, so area scales
+        as V**(2/3) and is not additive across materials.
+
+        Returns 0 without water, without active material, or when
+        ``daw <= 0``: the solution is then not supersaturated with respect to
+        ice (above about 0 degC for dilute droplets), so ice cannot nucleate.
+        """
         water_mass = self.base_particle.get_spec_mass("H2O")
         if water_mass <= 0:
             return 0.0
@@ -58,6 +72,11 @@ class HomogeneousParticle(FreezingParticle):
 
         P_wv, P_ice = calculate_Psat(T)
         delta_aw = self.get_aw() - P_ice / P_wv
+        if delta_aw <= 0:
+            # No supersaturation with respect to ice. Without this cut, a
+            # material with m_log10_Jhet = 0 (the packaged SOA rows) kept a
+            # constant rate at any temperature, e.g. P_frz = 5e-4 at +25 degC.
+            return 0.0
         rates = 10.0**(self.m_log10_Jhet[active] * delta_aw
                        + self.b_log10_Jhet[active])
         return np.sum(rates * volumes[active]) / np.sum(volumes[active])
