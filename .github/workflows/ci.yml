@@ -19,7 +19,11 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede only pull-request runs. Pushes, the weekly schedule and manual
+  # runs on a branch share one group; cancelling there would let a scheduled
+  # run drop the CI result for a pushed commit, or a push skip the scheduled
+  # dependency-drift check.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   MPLBACKEND: Agg
