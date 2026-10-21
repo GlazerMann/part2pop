@@ -136,3 +136,27 @@ def test_population_metadata_extended_scalar_roundtrip(tmp_path, dtype):
     assert isinstance(result, np.generic)
     assert result.dtype == value.dtype
     assert result == value
+
+
+def test_population_metadata_masked_array_is_rejected(tmp_path):
+    # np.asarray() would drop the mask and restore masked entries as data.
+    population = _simple_population()
+    population.metadata = {"flags": np.ma.masked_array([1.0, 2.0], mask=[False, True])}
+
+    with pytest.raises(TypeError, match="masked arrays"):
+        saver.save_population(tmp_path / "masked_metadata.npz", population)
+
+
+def test_loaded_metadata_is_independent_of_population_metadata(tmp_path):
+    population = _simple_population()
+    population.metadata = {"source": "roundtrip", "nested": {"values": np.array([1, 2])}}
+    saved = saver.save_population(tmp_path / "independent.npz", population)
+
+    loaded_pop, _, loaded_metadata = loader.load_population(saved)
+    loaded_pop.metadata["source"] = "edited"
+    loaded_pop.metadata["nested"]["values"][0] = 99
+
+    assert loaded_metadata["population_metadata"]["source"] == "roundtrip"
+    np.testing.assert_array_equal(
+        loaded_metadata["population_metadata"]["nested"]["values"], [1, 2]
+    )

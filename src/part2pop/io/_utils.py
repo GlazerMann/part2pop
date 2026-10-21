@@ -35,8 +35,11 @@ def _encode_population_metadata(value: Any, array_store: Dict[str, np.ndarray]) 
     remains a NumPy scalar use a tagged zero-dimensional array, preserving
     their dtype and precision. Non-object NumPy arrays are stored in the
     NPZ array store for lossless restoration. Object-dtype arrays are rejected
-    because loading uses ``allow_pickle=False``. Other unsupported objects are
-    stringified, matching :func:`make_json_safe`.
+    because loading uses ``allow_pickle=False``; masked arrays are rejected
+    because their mask cannot be stored losslessly here. Other unsupported
+    objects are stringified, matching :func:`make_json_safe`. Non-finite
+    Python floats are written with JSON's non-standard ``NaN``/``Infinity``
+    tokens, which part2pop reads back but strict JSON parsers may reject.
     """
     if isinstance(value, Mapping):
         return {
@@ -47,6 +50,13 @@ def _encode_population_metadata(value: Any, array_store: Dict[str, np.ndarray]) 
         }
     if isinstance(value, (list, tuple)):
         return [_encode_population_metadata(v, array_store) for v in value]
+    if isinstance(value, np.ma.MaskedArray):
+        # np.asarray would silently drop the mask, restoring masked entries
+        # as ordinary values on load.
+        raise TypeError(
+            "population metadata masked arrays are not supported; "
+            "fill them (np.ma.filled) or store the mask as a separate array"
+        )
     if isinstance(value, np.ndarray):
         if value.dtype.hasobject:
             raise TypeError("population metadata arrays with object dtype are not supported")
