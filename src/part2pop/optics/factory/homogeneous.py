@@ -19,6 +19,10 @@ except Exception as e:
 
 # Rayleigh theory is an asymptotic small-particle approximation. Keep its
 # opt-in fallback restricted to a deliberately conservative x << 1 regime.
+# x = 2*pi*r/lambda < 0.1 means radius < lambda / (20*pi): about 8.8 nm at
+# 550 nm and 6.4 nm at 400 nm. At x = 0.1 Rayleigh agrees with Mie to within
+# about 0.5% (scattering) and 1.2% (absorption) even for strongly absorbing
+# BC-like m = 1.95 + 0.79i, so the bound is conservative.
 _RAYLEIGH_MAX_X = 0.1
 
 @register("homogeneous")
@@ -28,7 +32,9 @@ class HomogeneousParticle(OpticalParticle):
 
     Constructor expects (base_particle, config) to align with the factory builder.
     Rayleigh fallback must be explicitly enabled with
-    ``allow_rayleigh_fallback=True`` and is restricted to x < 0.1.
+    ``allow_rayleigh_fallback=True`` and is restricted to x < 0.1 at every
+    evaluated RH and wavelength (wet radius below about 8.8 nm at 550 nm). One
+    larger particle anywhere on the grid aborts construction with ValueError.
 
     Optional config (read by OpticalParticle or here):
       - rh_grid, wvl_grid, temp (K), specdata_path, species_modifications
@@ -120,6 +126,11 @@ class HomogeneousParticle(OpticalParticle):
         homogeneous-sphere result with K = (m**2 - 1) / (m**2 + 2); see
         Bohren and Huffman, Absorption and Scattering of Light by Small
         Particles, Chapter 5.
+
+        ``m = n + ik`` uses part2pop's convention of a non-negative imaginary
+        part. Im(K) is then non-negative; a negative value (from k < 0, for
+        example an RI given in the opposite sign convention) is clamped to zero
+        absorption rather than producing a negative cross-section.
         """
         k = 2.0 * math.pi / wavelength_m
         m2 = m * m
