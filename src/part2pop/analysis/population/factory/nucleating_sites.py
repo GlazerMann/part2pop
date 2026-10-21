@@ -8,13 +8,20 @@ import numpy as np
 class NucleatingSites(PopulationVariable):
     """Integrate heterogeneous rates using the supplied particle water content.
 
-    No RH equilibration is performed here. Omitted species_modifications
-    inherit population overrides; an explicit mapping, including {}, replaces
-    them. The cooling-integral definition still requires scientific review.
+    Requires ``T_grid`` running strictly from warm to cold and a positive
+    constant ``cooling_rate`` in K/s. No RH equilibration is performed here.
+    Omitted or None species_modifications inherit population overrides; an
+    explicit mapping, including {}, replaces them.
+
+    The result is the area-weighted cumulative integral of J_het over cooling
+    time (m^-2). It equals the frozen-fraction-based active site density
+    -ln(1 - f)/A only for a population of identical particles without
+    depletion. The cooling-integral definition still requires scientific
+    review.
     """
     meta = VariableMeta(
         name="nucleating_sites",
-        description='Cumulative heterogeneous ice-nucleation active sites per surface area during cooling.',
+        description='Cumulative heterogeneous ice-nucleation active sites per surface area during cooling at a constant cooling_rate (K/s) over a warm-to-cold T_grid.',
         units = r'm$^{-2}$',
         axis_names=("T_grid",),
         default_cfg={},
@@ -30,9 +37,13 @@ class NucleatingSites(PopulationVariable):
         freezing_cfg = {
             "T_grid": list(cfg["T_grid"]),
             "morphology": cfg.get("morphology", "homogeneous"),
-            "species_modifications": cfg.get(
-                "species_modifications", getattr(population, "species_modifications", {})
-            ) or {},
+            # Omitted or None inherits the population's mapping, as in the other
+            # freezing analyses; an explicit mapping, including {}, replaces it.
+            "species_modifications": (
+                cfg["species_modifications"]
+                if cfg.get("species_modifications") is not None
+                else getattr(population, "species_modifications", None) or {}
+            ),
             "T_units": units
         }
         freezing_pop = build_freezing_population(population, freezing_cfg)

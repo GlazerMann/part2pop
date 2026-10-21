@@ -38,3 +38,14 @@ def test_explicit_empty_mapping_uses_defaults_and_override_replaces_population()
 def test_dry_population_is_not_equilibrated_implicitly():
     result = build({"T_grid": [260.0, 250.0], "cooling_rate": 1.0}).compute(_population(water=0.0))
     np.testing.assert_array_equal(result, [0.0, 0.0])
+
+
+def test_explicit_none_inherits_like_an_omitted_mapping():
+    # None used to fall through 'or {}' and reset the population's mapping,
+    # unlike the other freezing analyses, which treat None as "inherit".
+    pop = _population()
+    cfg = {"T_grid": [260.0, 250.0], "cooling_rate": 1.0}
+    inherited = build(cfg).compute(pop)
+    with_none = build(dict(cfg, species_modifications=None)).compute(pop)
+    np.testing.assert_array_equal(with_none, inherited)
+    np.testing.assert_allclose(with_none, [0.0, 10000.0], rtol=1e-12, atol=0.0)
