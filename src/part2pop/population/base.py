@@ -79,6 +79,15 @@ class ParticlePopulation:
     # fixme: add "equilibrate" for other species, too.
 
     def get_effective_radius(self):
+        """Return the area-weighted effective radius in meters.
+
+        Computed as ``sum(N * r**3) / sum(N * r**2)`` from each particle's wet
+        radius at its *current* water content; no humidity equilibration is
+        done here, so equilibrate the population first for a given RH. Returns
+        NaN when the total particle area is zero (an empty or
+        zero-concentration population). Releases before this change returned
+        the number-mean radius instead.
+        """
         rs = []
         for part_id in self.ids:
             particle = self.get_particle(part_id)
