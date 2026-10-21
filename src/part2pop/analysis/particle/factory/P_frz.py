@@ -4,6 +4,7 @@ from .registry import register_particle_variable
 from part2pop.freezing.builder import build_freezing_population
 from part2pop.analysis._freezing import resolve_freezing_config
 import numpy as np
+from part2pop.analysis._humidity import validate_equilibration_rh
 
 @register_particle_variable("P_frz")
 class FreezingProb(ParticleVariable):
@@ -32,6 +33,7 @@ class FreezingProb(ParticleVariable):
             raise ValueError(f"Unknown temperature unit: '{T_units}'.")
         if T_units=="C":
              T += 273.15
+        RH = validate_equilibration_rh(RH)
         population._equilibrate_h2o(RH, T)
 
         # Species overrides apply to this calculation, not population defaults.

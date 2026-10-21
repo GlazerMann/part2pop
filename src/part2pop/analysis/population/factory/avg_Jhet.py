@@ -1,5 +1,6 @@
 from __future__ import annotations
 import numpy as np
+from part2pop.analysis._humidity import validate_equilibration_rh
 from ..base import PopulationVariable, VariableMeta
 from .registry import register_variable
 from part2pop.freezing.builder import build_freezing_population
@@ -39,6 +40,7 @@ class avgJhetVar(PopulationVariable):
         T_grid = np.asarray(T_grid)
         if T_units=="C":
             T_grid = T_grid+273.15
+        RH = validate_equilibration_rh(RH)
         population._equilibrate_h2o(RH, T_grid[0])
 
         # Species overrides apply to this calculation, not population defaults.
