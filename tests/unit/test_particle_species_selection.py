@@ -39,3 +39,12 @@ def test_collection_and_absent_names_preserve_particle_order(names):
     np.testing.assert_array_equal(p.get_spec_mass(("H2O", "NaCl")), p.masses[indices])
     assert p.get_spec_mass("absent").size == 0
     assert p.get_spec_mass("aCl").size == 0
+
+
+def test_generator_selector_matches_every_requested_name(particle):
+    # A generator used to be consumed while testing the first species.
+    selected = particle.idx_spec(name for name in ("H2O", "NaCl"))[0]
+    np.testing.assert_array_equal(selected, [1, 2])
+    np.testing.assert_array_equal(
+        particle.get_spec_mass(name for name in ("Na", "H2O")), [1e-18, 3e-18]
+    )
