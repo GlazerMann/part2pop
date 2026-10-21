@@ -44,8 +44,9 @@ def test_invalid_temperature_is_rejected_before_water_mutation(temperature, unit
     np.testing.assert_array_equal(pop.spec_masses, before)
 
 
+@pytest.mark.parametrize("celsius", [0.0, -30.0])
 @pytest.mark.parametrize("inherited", [False, True])
-def test_zero_celsius_preserves_rh_equilibration_and_coefficient_overrides(inherited):
+def test_celsius_input_preserves_rh_equilibration_and_coefficient_overrides(inherited, celsius):
     from part2pop.freezing.builder import build_freezing_population
 
     p = make_particle(100e-9, ["BC", "SO4"], [0.5, 0.5])
@@ -55,18 +56,25 @@ def test_zero_celsius_preserves_rh_equilibration_and_coefficient_overrides(inher
 
     pop, control = make_pop(), make_pop()
     modifications = {"BC": {"m_log10_Jhet": 0.0, "b_log10_Jhet": 14.0}}
-    cfg = {"T": 0.0, "T_units": "C", "RH": 0.7}
+    cfg = {"T": celsius, "T_units": "C", "RH": 0.95}
     if inherited:
         pop.species_modifications = modifications
     else:
         cfg["species_modifications"] = modifications
     actual = build_variable("P_frz", scope="particle", var_cfg=cfg).compute_all(pop)
-    control._equilibrate_h2o(0.7, 273.15)
+    kelvin = celsius + 273.15
+    control._equilibrate_h2o(0.95, kelvin)
     freezing_cfg = {"morphology": "homogeneous", "species_modifications": modifications}
     frozen = build_freezing_population(control, freezing_cfg)
-    expected = frozen.get_freezing_probs(273.15, freezing_cfg)
-    assert 0.0 < actual[0] < 1.0
+    expected = frozen.get_freezing_probs(kelvin, freezing_cfg)
+    assert np.isfinite(actual).all()
     np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=0.0)
     np.testing.assert_allclose(
         pop.spec_masses, control.spec_masses, rtol=1e-12, atol=0.0
     )
+    if celsius < 0:
+        # At -30 degC and RH 0.95 the droplet (a_w ~ 0.95) is supersaturated
+        # with respect to ice (a_w,ice ~ 0.75), so it may freeze. At 0 degC it
+        # is not, and no positive probability is asserted there: m = 0 would
+        # otherwise imply freezing at any temperature.
+        assert 0.0 < actual[0] < 1.0
