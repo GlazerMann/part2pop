@@ -109,10 +109,6 @@ if _HAS_NETCDF4:
             dgn_a = currnc['dgn_a']
             dgn_awet = currnc['dgn_awet']
 
-            # temporary patch to avoid 0 mass fraction for empty modes
-            if so4_aer + soa_aer <= 0:
-                so4_aer = 1
-
             p = config['p']
             T = config['T']
             #from .binned_lognormals import build as build_binned_lognormals
@@ -130,6 +126,11 @@ if _HAS_NETCDF4:
             
             mass_so4 = so4_aer[idx,output_tt_idx] * rho_dry_air
             mass_soa = soa_aer[idx,output_tt_idx] * rho_dry_air
+            
+            # temporary patch to avoid 0 mass fraction for empty modes
+            if mass_so4 + mass_soa <= 0:
+                mass_so4 = 1
+
             # fixme: not actually sure what assumptions go into this for MAM4, assuming same GSD to compute mass H2O
             mass_h2o = DENSITY_LIQUID_WATER * np.pi/6 * np.array(
                     [
