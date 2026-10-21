@@ -14,8 +14,10 @@ Assumptions of the ``sulfate_oxide_organic_allocation`` scheme:
   biological) must be requested. Rows are treated as percent when the mean
   row sum is within ``np.isclose`` of 100 (about +/-0.001); the reconstructed
   species fractions must then sum to 0.99-1.01 or a ValueError is raised.
-  Unlisted elements (for example Ti or Br) are not read and are not
-  renormalized away.
+  Input values must be finite and nonnegative. Negative/noisy measurements
+  require explicit preprocessing; they are never silently clipped. All-zero
+  rows still fail the existing reconstructed-total check. Unlisted elements
+  (for example Ti or Br) are not read and are not renormalized away.
 * Hydrogen is not measured by EDX, so organic and ammonium mass is
   under-counted relative to the true particle mass.
 * Default branch: all S is sulfate (S + 4 O, capped by measured O). Mg, Al,
@@ -159,8 +161,18 @@ def _extract_particle_classes(data: pd.DataFrame, filename: str):
     return ptypes
 
 
+def _validate_fractions(values, label):
+    values = np.asarray(values, dtype=float)
+    if not np.all(np.isfinite(values)) or np.any(values < 0):
+        raise ValueError(f"{label} must be finite and nonnegative; preprocess noisy EDX data explicitly")
+    return values
+
+
 def _element_mass_fraction_dict(elements, mass_fraction) -> dict:
-    return dict(zip(elements, mass_fraction))
+    values = _validate_fractions(mass_fraction, "Element mass fractions")
+    if values.ndim != 1 or len(values) != len(elements):
+        raise ValueError("Element mass fractions must be a 1D row matching elements")
+    return dict(zip(elements, values))
 
 
 def _sulfate_oxygen_from_sulfur(data_dict: dict) -> float:
@@ -230,6 +242,7 @@ def read_edx_file(config: Dict[str, Any], elements: list[str]) -> EdxElementMass
     _validate_csv_extension(filename)
     data = pd.read_csv(filename)
     particle_massfracs, elements = _extract_element_mass_fractions(data, elements, filename)
+    _validate_fractions(particle_massfracs, "Element mass fractions")
     particle_massfracs = _convert_percent_to_fraction_if_needed(particle_massfracs)
     particle_diameters = _extract_particle_diameters(data, filename)
     ptypes = _extract_particle_classes(data, filename)
