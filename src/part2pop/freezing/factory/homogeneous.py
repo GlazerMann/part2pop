@@ -114,6 +114,12 @@ class HomogeneousParticle(FreezingParticle):
             ln(aw) = -Mw * sum_i b_i
         where b_i are ion molalities (mol/kg water).
 
+        Legacy classification: a nonwater material is a solute only when
+        BOTH effective heterogeneous coefficients are NaN. Disabling one
+        coefficient removes activity but not this solute exclusion; disabling
+        both can lower water activity and change homogeneous freezing. Active
+        area fixes do not decouple solubility from freezing coefficients.
+
         Returns
         -------
         aw : float
