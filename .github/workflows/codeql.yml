@@ -14,7 +14,10 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede only pull-request runs. Pushes to main, the weekly schedule and
+  # manual runs share the refs/heads/main group; cancelling there would drop
+  # the analysis for a pushed commit or skip the scheduled rescan.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   analyze:
