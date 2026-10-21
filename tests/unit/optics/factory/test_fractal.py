@@ -65,3 +65,12 @@ def test_fractal_build_wrapper():
     with pytest.warns(UserWarning, match="fractal particles is not yet implemented"):
         fp = build(base_particle, cfg)
     assert isinstance(fp, FractalParticle)
+
+
+def test_removed_single_scatter_albedo_key_warns():
+    pop = _make_bc_rich_population()
+    base_particle = pop.get_particle(pop.ids[0])
+    cfg = {"wvl_grid": [550e-9], "rh_grid": [0.0], "single_scatter_albedo": 0.95}
+    with pytest.warns(UserWarning) as record:
+        FractalParticle(base_particle, cfg)
+    assert any("single_scatter_albedo is no longer used" in str(w.message) for w in record)

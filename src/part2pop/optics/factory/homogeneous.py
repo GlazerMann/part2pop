@@ -47,6 +47,17 @@ class HomogeneousParticle(OpticalParticle):
 
     def __init__(self, base_particle, config):
         super().__init__(base_particle, config)
+        # single_scatter_albedo never affected the Mie or Rayleigh results and
+        # is no longer stored; warn rather than silently ignore a config that
+        # still passes it.
+        if "single_scatter_albedo" in config:
+            warnings.warn(
+                "single_scatter_albedo is no longer used and is ignored; "
+                "scattering and absorption come from the Mie calculation"
+                " (or the opt-in Rayleigh fallback).",
+                UserWarning,
+                stacklevel=2,
+            )
         self.allow_rayleigh_fallback = bool(config.get("allow_rayleigh_fallback", False))
 
         # Refractive indices are attached at the population level by the
