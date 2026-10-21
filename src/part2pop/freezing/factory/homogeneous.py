@@ -151,8 +151,9 @@ class HomogeneousParticle(FreezingParticle):
                     species.name, spec_modifications=spec_mod,
                     specdata_path=specdata_path
                 )
-            except ValueError:
-                # Missing table entry: require both custom coefficients.
+            except (ValueError, UnboundLocalError):
+                # Before PR #135, missing names can raise UnboundLocalError;
+                # the corrected exact-name reader raises ValueError.
                 m_Jhet = spec_mod.get("m_log10_Jhet", np.nan)
                 b_Jhet = spec_mod.get("b_log10_Jhet", np.nan)
             if not (np.isfinite(float(m_Jhet)) and np.isfinite(float(b_Jhet))):
