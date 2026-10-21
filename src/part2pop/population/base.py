@@ -8,6 +8,22 @@ import numpy as np
 from part2pop import Particle
 from part2pop import AerosolSpecies
 
+def _same_field_value(left, right):
+    """Compare species property values, treating two NaN values as equal.
+
+    A plain ``!=`` reports NaN as different from itself, so a species with an
+    unset (NaN) property would never match an identical copy of itself.
+    """
+    if left is right:
+        return True
+    if left == right:
+        return True
+    try:
+        return bool(np.isnan(left) and np.isnan(right))
+    except TypeError:
+        return False
+
+
 @dataclass
 class ParticlePopulation:
     """ParticlePopulation: the definition of a population of particles
@@ -67,7 +83,7 @@ class ParticlePopulation:
             for field in ("density", "kappa", "molar_mass", "surface_tension"):
                 left = getattr(spec, field, missing)
                 right = getattr(incoming, field, missing)
-                if left != right:
+                if not _same_field_value(left, right):
                     raise ValueError(f"Incompatible {field} for species {spec.name}")
         return masses[[indices[name] for name in names]].copy()
 

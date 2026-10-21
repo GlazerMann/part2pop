@@ -263,3 +263,32 @@ def test_missing_metadata_and_matrix_masses_fail_before_mutation(operation, prob
     np.testing.assert_array_equal(pop.spec_masses, before.spec_masses)
     np.testing.assert_array_equal(pop.num_concs, before.num_concs)
     assert pop.ids == before.ids
+
+
+@pytest.mark.parametrize("operation", ["add", "set"])
+def test_identical_species_with_nan_property_are_compatible(operation):
+    # NaN != NaN, so a NaN-valued property used to reject an identical copy.
+    base = tuple(get_species(n, None) for n in ["SO4", "BC"])
+    pop_species = (replace(base[0], surface_tension=float("nan")), base[1])
+    incoming_species = (replace(base[0], surface_tension=float("nan")), replace(base[1]))
+    pop = ParticlePopulation(
+        pop_species, np.array([[1e-18, 2e-18]]), np.array([1.0]), [0]
+    )
+    incoming = Particle(incoming_species, [3e-18, 4e-18])
+
+    if operation == "add":
+        pop.add_particle(incoming, 1, 2.0)
+        np.testing.assert_array_equal(pop.spec_masses[1], [3e-18, 4e-18])
+    else:
+        pop.set_particle(incoming, 0, 2.0)
+        np.testing.assert_array_equal(pop.spec_masses[0], [3e-18, 4e-18])
+
+
+def test_nan_property_still_differs_from_a_number():
+    base = tuple(get_species(n, None) for n in ["SO4", "BC"])
+    pop = ParticlePopulation(
+        (replace(base[0], kappa=float("nan")), base[1]),
+        np.array([[1e-18, 2e-18]]), np.array([1.0]), [0],
+    )
+    with pytest.raises(ValueError, match="kappa"):
+        pop.add_particle(Particle(base, [3e-18, 4e-18]), 1, 2.0)
