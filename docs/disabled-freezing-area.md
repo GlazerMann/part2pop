@@ -1,18 +1,22 @@
 # Disabled freezing material and active area
 
-Tabulated material contributes to active surface area only when both effective
-`m_log10_Jhet` and `b_log10_Jhet` are non-NaN. Setting either coefficient to NaN
-removes that material's volume from the equivalent-sphere area, matching its
-exclusion from the heterogeneous-rate mixture. A zero/zero pair remains active.
-Table coefficients are converted to floats for the check because the table
-reader returns strings.
+A species contributes its positive, finite volume to the equivalent-sphere
+active surface area only when both effective heterogeneous coefficients
+(`m_log10_Jhet` and `b_log10_Jhet`) are finite. Both tabulated species and
+custom species with complete override pairs follow this rule. A zero/zero pair
+is valid, whereas NaN or infinite coefficients disable the material.
 
-This standalone P12 patch applies directly to the pinned upstream main and
-does not require P05. It retains main's existing treatment of custom materials;
-P05 separately adds area support for complete custom coefficient pairs. If P05
-is already applied, use the archive's after-p05.patch variant instead of the
-standalone change.patch. The full series selects the after-P05 variant.
+Volumes are selected by species position, not substring name matching, so
+similarly named materials do not contaminate each other's active area.
+The area is calculated from the pooled active volume, not by summing
+individual particle surface areas.
 
-The equivalent-sphere morphology, freezing coefficients and water-activity
-classification are unchanged. P01 separately handles rates when no positive
-active volume is present. Both apply variants carry the same nine regressions.
+PR #127 implements matching custom-material and volume-alignment behavior.
+PR #135 independently fixes exact freezing-table lookup. Merge #135 first;
+then reconcile #127 and #136 against their shared implementation before the
+second of those PRs merges. PR #123 independently handles heterogeneous rate
+calculation for absent or disabled active species.
+
+The physical coefficient fits, morphology and water-activity relation are
+unchanged. The mapping between disabled materials and solutes is not changed
+by this active-area calculation.
