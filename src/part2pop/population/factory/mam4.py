@@ -139,7 +139,8 @@ if _HAS_NETCDF4:
                 for (m_so4,m_soa,m_h2o) in zip(mass_so4,mass_soa,mass_h2o):
             
                     # temporary patch to avoid 0 mass fraction for empty modes
-                    if m_so4 + m_soa + m_h2o <= 0:
+                    # excluding water in check to avoid zero mass for dry radius calculations
+                    if m_so4 + m_soa <= 0:
                         m_so4 = 1
 
                     spec_frac = np.array([m_so4,m_soa,m_h2o])
