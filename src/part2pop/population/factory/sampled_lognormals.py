@@ -18,8 +18,26 @@ from part2pop.species.registry import get_species
 import numpy as np
 
 
+def _sample_count(value):
+    """Validate raw counts before the generic normalizer can truncate them."""
+    if np.ndim(value) != 0 or np.iscomplexobj(value):
+        raise ValueError("N_parts must contain finite positive integer sample counts.")
+    try:
+        numeric = value if isinstance(value, (int, np.integer)) else float(value)
+        count = int(numeric)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("N_parts must contain finite positive integer sample counts.") from exc
+    if (count <= 0 or count > np.iinfo(np.intp).max
+            or not np.isfinite(numeric) or numeric != count):
+        raise ValueError("N_parts must contain finite positive integer sample counts.")
+    return count
+
+
 @register("sampled_lognormals")
 def build(config):
+    raw_n_parts = config.get("N_parts", 100)
+    config = dict(config)
+    config.pop("N_parts", None)
     config = normalize_population_config(config)
     seed = config.get("seed", None)
     rng = np.random.default_rng(seed)
@@ -31,7 +49,14 @@ def build(config):
     # If N_parts is a list, treat as one entry per mode (backward-compatible).
     # If N_parts is a scalar, treat as total samples from the *mixture*
     # and allocate per mode in proportion to N_list.
-    N_parts_cfg = config.get("N_parts", 100)
+    if (isinstance(raw_n_parts, (str, bytes)) or np.isscalar(raw_n_parts)
+            or isinstance(raw_n_parts, np.ndarray) and raw_n_parts.ndim == 0):
+        N_parts_cfg = _sample_count(raw_n_parts)
+    else:
+        try:
+            N_parts_cfg = [_sample_count(value) for value in raw_n_parts]
+        except TypeError as exc:
+            raise ValueError("N_parts must be an integer or an iterable of integers.") from exc
     specdata_path = config.get("specdata_path", None)
 
     # Finite entries can still overflow their sum. Reject that configuration
