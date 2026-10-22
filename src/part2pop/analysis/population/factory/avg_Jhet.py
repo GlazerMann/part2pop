@@ -27,12 +27,12 @@ class avgJhetVar(PopulationVariable):
         Validate and convert the entire grid before equilibrating water. This
         input check does not define an empirical nucleation-fit validity range.
         """
-        cfg = resolve_freezing_config(population, self.cfg)
+        cfg = self.cfg
         morphology = cfg.get("morphology", "homogeneous")
-        species_modifications = cfg.get("species_modifications", None)
+        species_modifications = resolve_freezing_config(population, cfg)["species_modifications"]
         T_grid = cfg.get("T_grid", None)
         T_units = cfg.get("T_units", None)
-        RH = cfg.get("RH", 0.85)
+        RH = validate_equilibration_rh(cfg.get("RH", 0.85))
         if T_grid is None and T_units is None:
             T_grid = np.linspace(233.15, 273.15, 50)
             T_units = "K"
@@ -50,7 +50,6 @@ class avgJhetVar(PopulationVariable):
             raise ValueError("T_grid must contain only finite temperatures > 0 K.")
 
         # Equilibrate only after every temperature has passed validation.
-        RH = validate_equilibration_rh(RH)
         population._equilibrate_h2o(RH, T_grid[0])
 
         # Species overrides apply to this calculation, not population defaults.
