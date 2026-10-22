@@ -24,6 +24,14 @@ except Exception as e:
 # about 0.5% (scattering) and 1.2% (absorption) even for strongly absorbing
 # BC-like m = 1.95 + 0.79i, so the bound is conservative.
 _RAYLEIGH_MAX_X = 0.1
+# Conservative, empirically checked acceptance policy; see the validity doc.
+# This bounds supported inputs, not a universal continuum error guarantee.
+_RAYLEIGH_REAL_RANGE = (1.0, 2.0)
+_RAYLEIGH_IMAG_RANGE = (0.0, 1.0)
+# Mixing indices at an inclusive bound can overshoot it by a few ULPs.
+# Allow only float64 roundoff on positive bounds; negative absorption stays
+# unsupported even when its magnitude is smaller than this relative allowance.
+_RAYLEIGH_RI_RTOL = 8.0 * np.finfo(float).eps
 
 @register("homogeneous")
 class HomogeneousParticle(OpticalParticle):
@@ -35,6 +43,9 @@ class HomogeneousParticle(OpticalParticle):
     ``allow_rayleigh_fallback=True`` and is restricted to x < 0.1 at every
     evaluated RH and wavelength (wet radius below about 8.8 nm at 550 nm). One
     larger particle anywhere on the grid aborts construction with ValueError.
+    The fallback additionally requires finite 1 <= Re(m) <= 2 and
+    0 <= Im(m) <= 1 at every evaluated point. This is an empirically checked
+    acceptance policy; see docs/rayleigh-fallback-validity.md.
 
     Optional config (read by OpticalParticle or here):
       - rh_grid, wvl_grid, temp (K), specdata_path, species_modifications
@@ -123,6 +134,30 @@ class HomogeneousParticle(OpticalParticle):
         return (self.h2o_ris[ww] * v_h2o + self.dry_ris[ww] * v_dry) / (v_h2o + v_dry)
 
     @staticmethod
+    def _validate_rayleigh_domain(m, wavelength_m, radius_m):
+        if (not np.all(np.isfinite([wavelength_m, radius_m]))
+                or wavelength_m <= 0 or radius_m < 0):
+            raise ValueError("Rayleigh fallback geometry requires a finite positive wavelength "
+                             "and finite nonnegative radius.")
+        size_parameter = 2.0 * math.pi * radius_m / wavelength_m
+        if not np.isfinite(size_parameter) or size_parameter >= _RAYLEIGH_MAX_X:
+            raise ValueError(
+                "Rayleigh fallback is outside its supported "
+                f"small-particle regime: x={size_parameter:.3g} "
+                f"must be < {_RAYLEIGH_MAX_X:g}."
+            )
+        real_min, real_max = _RAYLEIGH_REAL_RANGE
+        imag_min, imag_max = _RAYLEIGH_IMAG_RANGE
+        if (not np.all(np.isfinite([m.real, m.imag]))
+                or not real_min * (1 - _RAYLEIGH_RI_RTOL) <= m.real <= real_max * (1 + _RAYLEIGH_RI_RTOL)
+                or not imag_min <= m.imag <= imag_max * (1 + _RAYLEIGH_RI_RTOL)):
+            raise ValueError(
+                "Rayleigh fallback refractive index must satisfy "
+                "1 <= Re(m) <= 2 and 0 <= Im(m) <= 1; use PyMieScatt "
+                "for inputs outside this empirically checked domain."
+            )
+
+    @staticmethod
     def _rayleigh_cross_sections(m: complex, wavelength_m: float, radius_m: float):
         """Return Rayleigh Cext, Csca, Cabs, and g for a homogeneous sphere.
 
@@ -208,13 +243,7 @@ class HomogeneousParticle(OpticalParticle):
                     self.Cabs[rr, ww] = out["Qabs"] * geom_area
                     self.g[rr, ww] = out["g"]
                 else:
-                    size_parameter = 2.0 * math.pi * r_m / float(lam_m)
-                    if size_parameter >= _RAYLEIGH_MAX_X:
-                        raise ValueError(
-                            "Rayleigh fallback is outside its supported "
-                            f"small-particle regime: x={size_parameter:.3g} "
-                            f"must be < {_RAYLEIGH_MAX_X:g}."
-                        )
+                    self._validate_rayleigh_domain(m, float(lam_m), r_m)
                     cext, csca, cabs, g = self._rayleigh_cross_sections(
                         m=m,
                         wavelength_m=float(lam_m),
