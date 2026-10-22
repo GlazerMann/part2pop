@@ -33,3 +33,12 @@ solubility/activity metadata requires a separate reviewed scientific change.
 PR #127 additionally forwards INSA_distribution species overrides: omitted or
 None inherits population defaults; an explicit mapping replaces them, and {}
 clears inheritance. The analysis does not persist the mapping on the population.
+
+## Integration with the rate cutoff in PR #123
+
+The disabled-area positive-rate control uses a dilute droplet and explicitly
+checks ice supersaturation. A more concentrated NaN-disabled OC droplet can
+become ice undersaturated under the retained solute rule; #123 then correctly
+returns zero heterogeneous rate. Its dedicated solute/cutoff regression covers
+that case. Neither this fixture correction nor the area implementation changes
+water activity, solubility, homogeneous nucleation or #123's thermodynamic cut.
