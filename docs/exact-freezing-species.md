@@ -12,7 +12,8 @@ does not borrow its missing coefficient from a prefix-matched table species.
 Exact tabulated names retain their existing coefficients and override policy,
 including zero and NaN overrides; aliases remain the species registry's job.
 
-This lookup patch is independent on main. P05 supplies the separate custom-area
-behavior and P12 supplies disabled-material area consistency. Apply the default
-series for all three behaviors together. This does not change the retained
-coefficient-based water-activity classification or the table's scientific fits.
+Exact table-name lookup, particle-property name lookup and active-area
+selection are separate contracts. Exercise them together for custom names,
+complete and partial coefficient pairs, and disabled materials. Exact matching
+does not change coefficient-based water-activity classification or the table's
+scientific fits.
