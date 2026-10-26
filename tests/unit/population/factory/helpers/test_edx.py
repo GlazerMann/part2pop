@@ -3,6 +3,7 @@ import pytest
 
 from part2pop.population.factory.helpers.edx import (
     EdxElementMassFractions,
+    Population_MassFracs,
     _DEFAULT_EDX_TARGET_SPECIES,
     _normalize_or_raise,
     read_edx_file,
@@ -19,7 +20,8 @@ def _write_three_row_edx_csv(tmp_path):
         "0.5,biological,0.30,0.12,0.33,0.04,0.04,0.00,0.00,0.04,0.04,0.04,0.00,0.00,0.00,0.00,0.00,0.05\n"
         # Keep synthetic row within the existing EDX mass-balance guard.
         "0.7,carbonaceous,0.30,0.10,0.34,0.05,0.03,0.02,0.02,0.03,0.03,0.05,0.01,0.005,0.005,0.005,0.005,0.00\n"
-        # Keep synthetic row within the existing EDX mass-balance guard.
+        # Include Cu in the refactor parity fixture; the original O=0.39,
+        # Cu=0 row has a separate input/reconstruction regression below.
         "1.0,dust,0.20,0.10,0.38,0.05,0.03,0.02,0.02,0.03,0.03,0.05,0.01,0.02,0.01,0.02,0.02,0.01\n",
         encoding="utf-8",
     )
@@ -176,3 +178,32 @@ def test_reconstruction_routes_class_labels_by_whole_word(ptype, carbonaceous):
     else:
         assert so4 == pytest.approx(0.749, abs=5e-4)
         assert oc == pytest.approx(0.201, abs=5e-4)
+
+
+def test_legacy_edx_input_class_remains_compatible():
+    assert Population_MassFracs is EdxElementMassFractions
+    raw = Population_MassFracs(
+        np.array([1e-6]), np.array(["C"]), np.array([[1.0]]),
+        np.array(["carbonaceous"]),
+    )
+    assert isinstance(raw, EdxElementMassFractions)
+    np.testing.assert_array_equal(raw.mass_fractions, [[1.0]])
+
+
+def test_original_dust_csv_row_still_loads(tmp_path):
+    csv = _write_three_row_edx_csv(tmp_path)
+    csv.write_text(csv.read_text().replace(
+        "1.0,dust,0.20,0.10,0.38,0.05,0.03,0.02,0.02,0.03,0.03,0.05,0.01,0.02,0.01,0.02,0.02,0.01",
+        "1.0,dust,0.20,0.10,0.39,0.05,0.03,0.02,0.02,0.03,0.03,0.05,0.01,0.02,0.01,0.02,0.02,0.00",
+    ))
+    elements = ["C", "N", "O", "Na", "Mg", "Al", "Si", "P", "S", "Cl",
+                "K", "Ca", "Mn", "Fe", "Zn", "Cu"]
+    raw = read_edx_file({"edx_file": str(csv)}, elements)
+    assert raw.mass_fractions[2, elements.index("O")] == pytest.approx(0.39)
+    assert raw.mass_fractions[2, elements.index("Cu")] == 0.0
+    masses, _ = reconstruct_edx_species_mass_fractions(
+        raw, list(_DEFAULT_EDX_TARGET_SPECIES),
+    )
+    assert np.all(np.isfinite(masses))
+    assert np.all(masses >= 0)
+    np.testing.assert_allclose(masses.sum(axis=1), 1.0)

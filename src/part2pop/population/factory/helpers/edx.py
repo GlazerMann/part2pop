@@ -99,6 +99,11 @@ class EdxElementMassFractions:
     ptype: np.ndarray
 
 
+# Preserve the previous import and constructor contract. Keep this alias for
+# at least one release; EdxElementMassFractions is the descriptive new name.
+Population_MassFracs = EdxElementMassFractions
+
+
 def _validate_csv_extension(filename: str) -> None:
     extension = filename.split('.')[-1]
     if extension != 'csv':
