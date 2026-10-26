@@ -1,6 +1,6 @@
 # Rayleigh fallback acceptance policy
 
-The proposed opt-in fallback accepts only homogeneous passive positive-index
+The opt-in fallback accepts only homogeneous passive positive-index
 mixtures with 1 <= Re(m) <= 2, 0 <= Im(m) <= 1, and external size parameter
 x = 2*pi*r/lambda < 0.1 at every evaluated RH and wavelength. Refractive index,
 wavelength and radius must be finite; wavelength must be positive and radius
@@ -12,8 +12,8 @@ reject their mixture. The zero lower bound on Im(m) remains strict; negative
 absorption is not admitted by this allowance. Differences of 1e-10 outside the
 positive bounds are still rejected. No wavelength or size-domain bound changes.
 
-This is a conservative software acceptance policy for ordinary aerosol-like
-indices, proposed for maintainer review. It is not a universal Rayleigh theorem
+These bounds define a conservative software restriction for ordinary aerosol-like
+indices. They are not a universal Rayleigh theorem
 or a proof of an error bound throughout the continuum of accepted inputs.
 At the largest accepted index magnitude, |m|*x < sqrt(5)*0.1, so the policy also
 limits internal optical size. High-contrast, negative-index, gain-medium and
