@@ -35,6 +35,3 @@ Mie absorption ratios were about 0.4734 and 0.000994. The constructor now reject
 both. A different supported domain requires an explicit reviewed policy and
 new numerical validation; there is no bypass flag for unsupported indices.
 The direct formula helper remains available for characterization experiments.
-
-PR #105 contains the same fallback as #104; preserve this identical validation
-when combining their source changes, along with #105's separate SSA cleanup.

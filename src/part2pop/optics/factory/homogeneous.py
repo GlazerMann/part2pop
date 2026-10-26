@@ -51,10 +51,10 @@ class HomogeneousParticle(OpticalParticle):
       - rh_grid, wvl_grid, temp (K), specdata_path, species_modifications
       - allow_rayleigh_fallback (boolean, default False; Rayleigh opt-in)
     
-        If PyMieScatt is unavailable, construction fails unless the explicit
-        Rayleigh fallback is enabled. single_scatter_albedo is not a fallback
-        control and is not stored by this implementation.
-        """
+    If PyMieScatt is unavailable, construction fails unless the explicit
+    Rayleigh fallback is enabled. single_scatter_albedo is not a fallback
+    control and is not stored by this implementation.
+    """
 
     def __init__(self, base_particle, config):
         super().__init__(base_particle, config)
