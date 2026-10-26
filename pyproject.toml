@@ -49,7 +49,7 @@ dependencies = [
   "matplotlib",
   "netCDF4",
   "importlib-resources",
-  "PyMieScatt",
+  "PyMieScatt @ git+https://github.com/mattldawson/PyMieScatt@908d1c27eccaf4d0193acf0b209226da96e8d59b",
   "pyBCabs",
   "tqdm",
   "streamlit",
