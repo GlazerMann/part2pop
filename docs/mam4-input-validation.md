@@ -1,27 +1,17 @@
-# MAM4 input validation
+# MAM4 reconstruction inputs
 
-Number concentrations must be finite and nonnegative for every original mode,
-before zero-number modes are filtered. A negative, NaN, infinite or masked
-number is invalid data, not an inactive mode. Zero-number modes may omit their
-composition; their diameter and composition fields are not reconstructed.
+Modes with exactly zero number concentration are omitted from initialization
+and output reconstruction. All per-mode parameters are selected by the same
+original mode indices. Unused composition in zero-number modes is ignored.
 
-For active output modes, pressure (Pa), temperature (K) and converted dry-air
-density must be finite positive real scalars. Complex scalar inputs are rejected
-before float conversion can discard their imaginary parts. Dry diameters must be finite positive
-and GSD must exceed one, matching the continuous binned-lognormal factory.
-Component masses must be finite nonnegative and their reconstructed total
-finite positive before normalization. Missing or masked required values fail.
-Wet reconstruction additionally requires finite positive wet diameters >= dry
-diameters and finite nonnegative water mass. No negative-value clipping,
-NaN-to-zero replacement or measurement-noise tolerance is introduced. Dry-only
-construction does not use or validate wet-diameter values.
+Active modes require finite nonnegative represented SO4/OC components and a
+strictly positive dry total, including when wet sizes imply positive water.
+The reader raises ValueError rather than inventing sulfate for an active mode
+with no represented dry material. Files whose dry material exists only in
+unrepresented native species need an extended reader, not a fallback mixture.
 
-Initial active-mode fractions use the same finite/nonnegative and positive-total
-checks before normalization. Invalid inputs now raise ValueError rather than
-silently dropping a mode or returning negative water. Valid inputs retain the
-same normalization, air-density conversion and same-GSD moment assumptions.
-
-This does not fix issue #137's diameter/mass/number timing mismatch or choose an
-effective-density model. The timestep=1 namelist / timestep>=2 record n-2
-mapping is retained. Scientific timing and example-configuration corrections
-must be reviewed separately; simply shifting the timestep index is not a fix.
+Negative values and wet diameters smaller than dry diameters are rejected
+without clipping or an invented measurement tolerance. This validation does
+not resolve native record timing, unsupported species or the same-GSD wet/dry
+moment assumption. The public timestep contract remains 1 for initialization
+and n >= 2 for output record n - 2.

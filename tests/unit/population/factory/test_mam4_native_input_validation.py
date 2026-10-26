@@ -72,9 +72,10 @@ def test_dry_only_construction_does_not_use_wet_diameters(tmp_path):
     assert np.all(pop.spec_masses >= 0)
 
 
-def test_zero_active_dry_composition_is_rejected_before_normalization(tmp_path):
+@pytest.mark.parametrize("wet", [False, True])
+def test_zero_active_dry_composition_is_rejected_before_normalization(tmp_path, wet):
     cfg = _output(tmp_path, [1e6] * 4)
-    cfg["D_is_wet"] = False
+    cfg["D_is_wet"] = wet
     with netCDF4.Dataset(tmp_path / "mam_output.nc", "r+") as ds:
         ds["so4_aer"][:] = 0.
         ds["soa_aer"][:] = 0.

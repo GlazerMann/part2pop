@@ -207,6 +207,14 @@ if _HAS_NETCDF4:
             with np.errstate(over="ignore", invalid="ignore"):
                 mass_so4 = mass_so4 * rho_dry_air
                 mass_soa = mass_soa * rho_dry_air
+            # A mode with positive number and dry diameter needs represented
+            # dry material. Water must not hide an empty SO4/OC composition,
+            # and a postprocessor must not invent sulfate to fill that gap.
+            for mode, sulfate, organic in zip(idx, mass_so4, mass_soa):
+                _normalized_composition(
+                    (sulfate, organic),
+                    f"MAM output composition for mode {mode} (dry material)",
+                )
             if D_is_wet:
                 GMDs_wet = _validated_mode_values(
                     dgn_awet[idx], 'MAM wet diameters', positive=True
