@@ -16,23 +16,20 @@ resolver creates an analysis-local configuration and borrows the selected mappin
 freezing construction treats that mapping as read-only. Direct freezing-builder
 APIs retain their existing behavior.
 
-Humidity equilibration retains its existing water-mass side effects. This patch
-does not make all diagnostic calculations pure or change temperature conversion,
+Humidity equilibration retains its existing water-mass side effects.
+These entry points do not make all diagnostic calculations pure or change temperature conversion,
 freezing geometry, rate formulas, stochastic treatment, or time stepping.
 
-The separate P05 custom-area patch gives `INSA_distribution` this same policy;
-apply both to cover all six analysis entry points. P11 is independently applicable
-to the pinned upstream base and supplies the other five entry points. The missing
-nucleating-site numerical API is repaired by existing PR #117, not by this patch.
+Check INSA distribution override forwarding separately for the same policy.
+Configuration routing alone does not supply a nucleating_sites numerical
+method; verify its availability and accepted scientific definition before use.
 
 ## Temperature and humidity integration
 
 The analysis implementations also retain the temperature validation and unit
-contracts of PRs #111, #116 and #131. Zero Celsius is valid; temperatures are
+contracts described here. Zero Celsius is valid; temperatures are
 converted once, must be finite and above absolute zero, and are validated
 before water equilibration. Frozen/unfrozen fractions retain RH=None as a
 request to use current water and RH=0 as an explicit dry equilibrium. P_frz and
-avg_Jhet validate required RH through the existing shared validator. Shared
-regression files are byte-identical across the overlapping PRs and should be
-kept once. The nucleating_sites numerical method still comes from PR #117;
-this patch does not choose or duplicate its provisional scientific definition.
+avg_Jhet validate required RH through the existing shared validator. The nucleating_sites observable retains its separately documented provisional
+scientific definition; configuration forwarding does not validate that model.
