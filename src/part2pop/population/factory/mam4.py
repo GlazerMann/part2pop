@@ -127,6 +127,7 @@ if _HAS_NETCDF4:
             
             mass_so4 = so4_aer[idx,output_tt_idx] * rho_dry_air
             mass_soa = soa_aer[idx,output_tt_idx] * rho_dry_air
+            
             # fixme: not actually sure what assumptions go into this for MAM4, assuming same GSD to compute mass H2O
             mass_h2o = DENSITY_LIQUID_WATER * np.pi/6 * np.array(
                     [
@@ -137,6 +138,12 @@ if _HAS_NETCDF4:
                 aero_spec_names = [['SO4','OC','H2O'],['SO4','OC','H2O'],['SO4','OC','H2O'],['SO4','OC','H2O']]
                 aero_spec_fracs = []
                 for (m_so4,m_soa,m_h2o) in zip(mass_so4,mass_soa,mass_h2o):
+            
+                    # temporary patch to avoid 0 mass fraction for empty modes
+                    # excluding water in check to avoid zero mass for dry radius calculations
+                    if m_so4 + m_soa <= 0:
+                        m_so4 = 1
+
                     spec_frac = np.array([m_so4,m_soa,m_h2o])
                     spec_frac /= np.sum(spec_frac)
                     spec_frac[np.isnan(spec_frac)] = 0.
@@ -145,6 +152,11 @@ if _HAS_NETCDF4:
                 aero_spec_names = [['SO4','OC'],['SO4','OC'],['SO4','OC'],['SO4','OC']]
                 aero_spec_fracs = []
                 for (m_so4,m_soa) in zip(mass_so4,mass_soa):
+            
+                    # temporary patch to avoid 0 mass fraction for empty modes
+                    if m_so4 + m_soa <= 0:
+                        m_so4 = 1
+
                     spec_frac = np.array([m_so4,m_soa])
                     spec_frac /= np.sum(spec_frac)
                     spec_frac[np.isnan(spec_frac)] = 0.
